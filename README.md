@@ -42,7 +42,7 @@ Com isso, o Git está pronto para uso em seu computador e integrado ao GitHub e 
 ## Clonagem com GitHub Desktop
 Para clonar este repositório usando o GitHub Desktop, siga estes passos:
 1. Abra o GitHub Desktop e faça login em sua conta GitHub, se ainda não tiver feito.
-2. No menu superior, clique em File > Clone repository.
+2. No menu superior, clique em **File > Clone repository**.
 3. Na aba “URL” ou “GitHub.com”, selecione o repositório que deseja clonar (ou cole a URL do repositório). Por exemplo: `https://github.com/seuUsuario/seuRepositorio.git`.
 4. Escolha a pasta local onde deseja clonar o projeto e clique em **Clone**.
 
