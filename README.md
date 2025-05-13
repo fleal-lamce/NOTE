@@ -83,7 +83,7 @@ Um bom fluxo de trabalho com branches ajuda a manter o código organizado:
 git checkout -b feature/minha-nova-funcionalidade
 ```
 - Faça commits regulares na sua branch de funcionalidade.
-- Para incorporar as mudanças de outras pessoas, use **Pull** ou **Fetch** no GitHub Desktop na branch principal (geralmente main ou master) e, em seguida, integre as alterações:
+- Para incorporar as mudanças de outras pessoas, use **Pull** ou **Fetch** no GitHub Desktop na Main e, em seguida, integre as alterações:
 ```ruby
 git checkout main
 git pull
