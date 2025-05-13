@@ -21,7 +21,6 @@ Este README tem como objetivo servir de exemplo para demonstrar o uso do Git e G
 ## Pré-requisitos
 Antes de começar, verifique se você possui os seguintes itens instalados e configurados em seu sistema:
 - **Git:** Baixe e instale o Git (versão mais recente recomendada).
-- **Conta no GitHub:** Crie uma conta gratuita em GitHub.
 - **GitHub Desktop:** Instale o GitHub Desktop para facilitar o uso do Git com interface gráfica.
 - **Visual Studio Code:** Instale o VS Code como editor de código (opcional, mas recomendado).
 - **Conta de desenvolvedor:** Acesso à internet para clonar e atualizar repositórios remotos.
