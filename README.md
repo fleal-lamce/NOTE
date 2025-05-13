@@ -32,8 +32,8 @@ Antes de começar, verifique se você possui os seguintes itens instalados e con
 git config --global user.name "Seu Nome"
 git config --global user.email "seu.email@exemplo.com"
 ```
-Isso garante que os commits sejam associados corretamente à sua identidade.
 
+Isso garante que os commits sejam associados corretamente à sua identidade.
 3. **Instale o GitHub Desktop:** Baixe e instale o GitHub Desktop. Ele permite clonar repositórios e realizar operações de Git por meio de uma interface amigável. Ao abrir o GitHub Desktop pela primeira vez, faça login com sua conta GitHub.
 4. **Integre com o VS Code:** No VS Code, certifique-se de que a extensão GitHub Pull Requests and Issues esteja instalada (geralmente já vem por padrão). Ela facilita o gerenciamento de repositórios Git e Pull Requests diretamente do editor. Para instalar extensões, abra o **Gerenciador de Extensões** do VS Code e pesquise por “GitHub”.
 5. **Teste a instalação:** No terminal ou no VS Code, `digite git --version` e `gh --version` (se usar o GitHub CLI) para confirmar que as ferramentas estão instaladas e acessíveis.
@@ -65,6 +65,7 @@ pip install -r requirements.txt
 npm start    # Inicia aplicação em Node.js
 dotnet run   # Para projetos .NET
 ```
+
 4. **Verifique o funcionamento:** Acesse o aplicativo ou visualize o resultado para garantir que tudo esteja funcionando corretamente.\
 5 **Realize alterações:** Faça pequenas mudanças de teste no código, salve e rode novamente para ver os efeitos. Isso ajuda a confirmar que o fluxo de trabalho está configurado corretamente.
 
