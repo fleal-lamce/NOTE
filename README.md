@@ -64,7 +64,7 @@ pip install -r requirements.txt
 npm start    # Inicia aplicação em Node.js
 dotnet run   # Para projetos .NET
 ```
-4. **Verifique o funcionamento:** Acesse o aplicativo ou visualize o resultado para garantir que tudo esteja funcionando corretamente.
+4. **Verifique o funcionamento:** Acesse o aplicativo ou visualize o resultado para garantir que tudo esteja funcionando corretamente.\
 5 **Realize alterações:** Faça pequenas mudanças de teste no código, salve e rode novamente para ver os efeitos. Isso ajuda a confirmar que o fluxo de trabalho está configurado corretamente.
 
 ## Uso do GitHub Desktop: commit, pull, push
