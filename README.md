@@ -3,13 +3,13 @@
 ## Índice
 - [Uso do Repositório](#Uso-do-Repositório)
 - [Pré-requisitos](#Pré-requisitos)
-- [Instalação do Git e Integração com GitHub e VSCode](Instalação-do-Git-e-Integração-com-GitHub-e-VSCode)
-- [Clonagem com GitHub Desktop](Clonagem-com-GitHub-Desktop)
-- [Quick Start (Primeiros Passos)](Quick-Start-(Primeiros-Passos))
-- [Uso do GitHub Desktop: commit, pull, push](Uso-do-GitHub-Desktop:-commit,-pull,-push)
-- [Fluxo de Branches](Fluxo-de-Branches)
-- [Contribuição](Contribuição)
-- [Contato e Créditos](Contato-e-Créditos)
+- [Instalação do Git e Integração com GitHub e VSCode](#Instalação-do-Git-e-Integração-com-GitHub-e-VSCode)
+- [Clonagem com GitHub Desktop](#Clonagem-com-GitHub-Desktop)
+- [Quick Start (Primeiros Passos)](#Quick-Start-(Primeiros-Passos))
+- [Uso do GitHub Desktop: commit, pull, push](#Uso-do-GitHub-Desktop:-commit,-pull,-push)
+- [Fluxo de Branches](#Fluxo-de-Branches)
+- [Contribuição](#Contribuição)
+- [Contato e Créditos](#Contato-e-Créditos)
 
 ## Uso do repositório
 Este README tem como objetivo servir de exemplo para demonstrar o uso do Git e GitHub em fluxos de trabalho de desenvolvimento de software. Ele apresenta orientações de configuração do ambiente, comandos básicos do Git, uso do GitHub Desktop e do Visual Studio Code, além de boas práticas de colaboração. A ideia é fornecer um guia prático de como configurar, clonar, versionar código e colaborar em projetos usando Git e GitHub.
