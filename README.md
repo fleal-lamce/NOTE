@@ -110,7 +110,7 @@ git checkout -b feature/nome-da-sua-feature
 - **Coordenador Técnico:** Fabio Hochleitner
 - **Colaboradores:**
 1. Clariana Borges
-2. Felipe Leal - @fleal@lamce.coppe.ufrj.br
+2. Felipe Leal - fleal@lamce.coppe.ufrj.br
 3. Hudson Campos
 4. João Teixeira
 5. Léo Lotsch
