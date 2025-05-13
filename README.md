@@ -58,11 +58,11 @@ Após clonar o repositório, siga estes passos iniciais para configurar e execut
 npm install
 ```
 ou
-```
+```ruby
 pip install -r requirements.txt
 ```
 3. **Execute o projeto:** Siga as instruções específicas do projeto para executá-lo. Exemplos comuns:
-```
+```ruby
 npm start    # Inicia aplicação em Node.js
 dotnet run   # Para projetos .NET
 ```
@@ -79,12 +79,12 @@ Lembre-se de commitar frequentemente e de usar mensagens claras. O GitHub Deskto
 ## Fluxo de Branches
 Um bom fluxo de trabalho com branches ajuda a manter o código organizado:
 - Crie uma branch separada para cada nova funcionalidade ou correção. Por exemplo:
-```
+```ruby
 git checkout -b feature/minha-nova-funcionalidade
 ```
 - Faça commits regulares na sua branch de funcionalidade.
 - Para incorporar as mudanças de outras pessoas, use **Pull** ou **Fetch** no GitHub Desktop na branch principal (geralmente main ou master) e, em seguida, integre as alterações:
-```
+```ruby
 git checkout main
 git pull
 git checkout feature/minha-nova-funcionalidade
@@ -98,7 +98,7 @@ Contribuições são bem-vindas! Para colaborar com este projeto, siga as etapas
 - Fork este repositório em sua conta GitHub.
 - Abra uma issue para descrever o que você pretende melhorar ou corrigir, garantindo que a ideia não esteja sendo trabalhada por outra pessoa.
 - Faça um clone do seu fork localmente e crie uma branch para sua contribuição:
-```
+```ruby
 git checkout -b feature/nome-da-sua-feature
 ```
 - Realize as alterações necessárias em seu código. Teste tudo antes de prosseguir.
