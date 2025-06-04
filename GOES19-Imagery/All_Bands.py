@@ -1,4 +1,4 @@
-
+# Parte 1: Imports e configurações
 import os
 import re
 import time
@@ -17,132 +17,113 @@ from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from PIL import Image
 import GOES
 
-# NOAA-style custom colormaps
-from matplotlib.colors import LinearSegmentedColormap
-
-band7_cmap = LinearSegmentedColormap.from_list("band7_cmap", [
-    (0.00, '#2c2c2c'),
-    (0.50, '#ffff00'),
-    (1.00, '#ff0000')
-])
-
-band13_cmap = LinearSegmentedColormap.from_list("band13_cmap", [
-    (0.00, '#ffffff'),
-    (0.20, '#ff0000'),
-    (0.40, '#ffa500'),
-    (0.60, '#00ff00'),
-    (0.80, '#0000ff'),
-    (1.00, '#000000')
-])
-
-from matplotlib.colors import LinearSegmentedColormap
-
-fire_cmap = LinearSegmentedColormap.from_list("noaa_fire", [
-    (0.00, "#000000"),
-    (0.40, "#555555"),
-    (0.70, "#FFFF00"),
-    (0.85, "#FF7F00"),
-    (1.00, "#FF0000"),
-])
-
-wv_cmap = LinearSegmentedColormap.from_list("noaa_water_vapor", [
-    (0.00, "#7f0000"),
-    (0.20, "#ff8000"),
-    (0.40, "#ffff00"),
-    (0.60, "#ffffff"),
-    (0.80, "#80d4ff"),
-    (0.90, "#00bfff"),
-    (1.00, "#00ff00"),
-])
-
-ir_cmap = LinearSegmentedColormap.from_list("noaa_ir", [
-    (0.00, "#ffffff"),
-    (0.15, "#ff0000"),
-    (0.30, "#ffa500"),
-    (0.45, "#00ff00"),
-    (0.60, "#00bfff"),
-    (0.75, "#808080"),
-    (1.00, "#000000"),
-])
-
-# Configuration
-INCOMING_DIR  = r"D:\teste1"
-ORGANIZED_DIR = r"D:\GOES-Organized"
-DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
+# Diretórios
+INCOMING_DIR  = r"E:\teste1"
+ORGANIZED_DIR = r"E:\GOES-Organized"
 LOGO_LEFT     = r"C:\Users\ire0034\Downloads\AssVisual_LAMCE\assVisual_LAMCE_COR_SemTextoTransparente.png"
 LOGO_RIGHT    = r"C:\Users\ire0034\Downloads\BaiaDigital\BaiaDigital-02.png"
+DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
 SLEEP_SECONDS = 600
 
-logging.basicConfig(
-    filename='goes_loop.log',
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# Logging
+logging.basicConfig(filename='goes_loop.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
+# Parte 2: Colormaps exatos para cada banda
+def reflectance_cmap(name):
+    return mcolors.LinearSegmentedColormap.from_list(name, [
+        (0.0, "#000000"), (1.0, "#FFFFFF")
+    ])
+
+cmap_band07 = mcolors.LinearSegmentedColormap.from_list("Band07", [
+    (-90, "#00FFFF"),
+    (-20, "#000000"),
+    (100, "#FFFFFF")
+], N=256)
+
+temps_8_10 = [-90, -80, -70, -60, -50, -40, -35, -30, -25, -20, -15, -10, -5, -2.5, 0]
+colors_8_10 = [
+    "#ffffff", "#00ffff", "#00ff00", "#0000ff", "#dddddd", "#cccccc", "#aaaaaa", "#aa5500",
+    "#aa3300", "#550000", "#aa0000", "#ff0000", "#ffcc00", "#ffff00", "#ffff00"
+]
+norm_8_10 = mcolors.Normalize(vmin=min(temps_8_10), vmax=max(temps_8_10))
+cmap_band08 = mcolors.LinearSegmentedColormap.from_list("Band08", list(zip(norm_8_10(temps_8_10), colors_8_10)), N=256)
+
+temps_ir_std = [-90, -80, -70, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40]
+colors_ir_std = [
+    "#ff0000", "#ff8000", "#ffff00", "#00ff00", "#00ffff", "#70a0ff", "#a0c0ff", "#b0d0ff",
+    "#d0e0e0", "#c0c0c0", "#a0a0a0", "#808080", "#403030", "#000000"
+]
+norm_ir_std = mcolors.Normalize(vmin=min(temps_ir_std), vmax=max(temps_ir_std))
+cmap_ir_standard = mcolors.LinearSegmentedColormap.from_list("IRStandard", list(zip(norm_ir_std(temps_ir_std), colors_ir_std)), N=256)
+
+temps_15 = temps_ir_std
+colors_15 = [
+    "#0000ff", "#4b0082", "#00ffff", "#00ff00", "#adff2f", "#ffff00", "#ff8000", "#ff0000",
+    "#ff00ff", "#dcdcdc", "#a9a9a9", "#696969", "#404040", "#000000"
+]
+norm_15 = mcolors.Normalize(vmin=min(temps_15), vmax=max(temps_15))
+cmap_band15 = mcolors.LinearSegmentedColormap.from_list("Band15", list(zip(norm_15(temps_15), colors_15)), N=256)
+
+colormaps = {
+    1: "Blue Visible", 2: "Red Visible", 3: "Veggie (Near-IR)", 4: "Cirrus (Near-IR)",
+    5: "Snow/Ice (Near-IR)", 6: "Cloud Particle Size (Near-IR)", 7: "Shortwave IR",
+    8: "Upper-Level Water Vapor", 9: "Mid-Level Water Vapor", 10: "Lower-Level Water Vapor",
+    11: "Cloud-Top Phase IR", 12: "Ozone IR", 13: "Clean Longwave IR",
+    14: "IR Longwave Window", 15: "Dirty Longwave IR", 16: "CO₂ Longwave IR"
+}
+
+vmin_vmax = {
+    **{i: (0, 100) for i in range(1, 7)},
+    7: (-90, 100),
+    **{i: (-90, 0) for i in [8, 9, 10]},
+    **{i: (-90, 40) for i in [11, 12, 13, 14, 15, 16]}
+}
+
+cmap_lookup = {
+    1: reflectance_cmap("Band01"), 2: reflectance_cmap("Band02"), 3: reflectance_cmap("Band03"),
+    4: reflectance_cmap("Band04"), 5: reflectance_cmap("Band05"), 6: reflectance_cmap("Band06"),
+    7: cmap_band07, 8: cmap_band08, 9: cmap_band08, 10: cmap_band08,
+    11: cmap_ir_standard, 12: cmap_ir_standard, 13: cmap_ir_standard,
+    14: cmap_ir_standard, 15: cmap_band15, 16: cmap_ir_standard
+}
+
+# Parte 3: Função de logo
 def add_logo(fig, logo_path, left=True, scale=0.12, alpha=1.0):
     try:
         logo = Image.open(logo_path)
+        dpi = fig.dpi
+        fig_w, fig_h = fig.get_size_inches()
+        th = int(fig_h * scale * dpi)
+        tw = int(th * (logo.width / logo.height))
+        logo = logo.resize((tw, th), Image.LANCZOS)
+        arr = np.array(logo)
+        margin = int(fig_w * dpi * 0.02)
+        xpos = margin if left else int(fig_w * dpi - tw - margin)
+        ypos = int((fig_h * dpi - th) / 2)
+        fig.figimage(arr, xo=xpos, yo=ypos, alpha=alpha, zorder=1000)
     except Exception as e:
-        logging.warning(f"Could not load logo {logo_path}: {e}")
-        return
+        logging.warning(f"Logo error: {e}")
 
-    dpi        = fig.dpi
-    fig_w, fig_h = fig.get_size_inches()
-    th = int(fig_h * scale * dpi)
-    tw = int(th * (logo.width / logo.height))
-    logo = logo.resize((tw, th), Image.LANCZOS)
-    arr  = np.array(logo)
-
-    margin = int(fig_w * dpi * 0.02)
-    xpos = margin if left else int(fig_w * dpi - tw - margin)
-    ypos = int((fig_h * dpi - th) / 2)
-
-    fig.figimage(arr, xo=xpos, yo=ypos, alpha=alpha, zorder=1000)
-
+# Parte 4: Loop principal
 while True:
     try:
         for band_folder in sorted(os.listdir(INCOMING_DIR)):
             band_path = os.path.join(INCOMING_DIR, band_folder)
-            if not os.path.isdir(band_path):
-                continue
-
+            if not os.path.isdir(band_path): continue
             m = re.match(r'Band\s*0*([1-9]\d?)', band_folder, re.IGNORECASE)
-            if not m:
-                logging.warning(f"Unable to parse band number from folder '{band_folder}'; skipping")
-                continue
+            if not m: continue
             band_num = int(m.group(1))
-            if band_num < 1 or band_num > 16:
-                continue
+            if band_num not in colormaps: continue
 
             for nc_path in sorted(glob.glob(os.path.join(band_path, '*.nc'))):
                 try:
                     ds = GOES.open_dataset(nc_path)
                     CMI, Lon, Lat = ds.image('CMI', lonlat='corner', domain=DOMAIN)
                     data = CMI.data.astype(float)
+                    if band_num >= 7: data -= 273.15
 
-                    if 7 <= band_num <= 16:
-                        data -= 273.15
-                        units = '°C'
-                    else:
-                        units = CMI.standard_name or 'Reflectance'
-
-                    if band_num == 7:
-                        cmap = band7_cmap
-                        cmap = fire_cmap
-                        vmin, vmax = -80, 70
-                    elif band_num in [8, 9, 10]:
-                        cmap = wv_cmap
-                        vmin, vmax = -90, 10
-                    elif band_num == 13:
-                        cmap = band13_cmap
-                        vmin, vmax = -90, 50
-                    elif band_num >= 11:
-                        cmap = ir_cmap
-                        vmin, vmax = -90, 50
-                    else:
-                        cmap = 'Greys'
-                        vmin, vmax = 0, 1
+                    cmap = cmap_lookup[band_num]
+                    vmin, vmax = vmin_vmax[band_num]
 
                     fig = plt.figure(figsize=(14, 6), dpi=200, constrained_layout=True)
                     gs = fig.add_gridspec(20, 24)
@@ -153,8 +134,8 @@ while True:
                                          norm=mcolors.Normalize(vmin=vmin, vmax=vmax))
 
                     cax = fig.add_subplot(gs[19, 4:20])
-                    cb  = plt.colorbar(mesh, cax=cax, orientation='horizontal', extend='both')
-                    cb.set_label(f'{units}', size=9)
+                    cb = plt.colorbar(mesh, cax=cax, orientation='horizontal', extend='both')
+                    cb.set_label('Brightness Temperature (°C)' if band_num >= 7 else 'Reflectance (%)', size=9)
                     cb.ax.tick_params(labelsize=8)
 
                     utc_dt = CMI.time_bounds.data[0]
@@ -165,9 +146,11 @@ while True:
                     br_dt = utc_dt.astimezone(ZoneInfo('America/Sao_Paulo'))
 
                     band_id = ds.variable('band_id').data[0]
-                    wl      = ds.variable('band_wavelength').data[0]
+                    wl = ds.variable('band_wavelength').data[0]
+                    product = colormaps.get(band_num, "Unknown")
+
                     fig.suptitle(
-                        f'{ds.attribute("platform_ID")} - Band {band_id:02d}\n'
+                        f'{ds.attribute("platform_ID")} - Band {band_id:02d}: {product}\n'
                         f'{br_dt.strftime("%Y-%m-%d %H:%M BRT")}\n'
                         f'{wl:.1f} µm',
                         y=0.98, fontsize=8, linespacing=1.5
@@ -180,20 +163,13 @@ while True:
                     ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
                     ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
 
-                    add_logo(fig, LOGO_LEFT,  left=True,  scale=0.12)
-                    add_logo(fig, LOGO_RIGHT, left=False, scale=0.12)
+                    add_logo(fig, LOGO_LEFT, left=True)
+                    add_logo(fig, LOGO_RIGHT, left=False)
 
-                    out_dir = os.path.join(
-                        ORGANIZED_DIR,
-                        band_folder,
-                        f"{br_dt.year:04d}",
-                        f"{br_dt.month:02d}",
-                        f"{br_dt.day:02d}"
-                    )
+                    out_dir = os.path.join(ORGANIZED_DIR, band_folder,
+                                           f"{br_dt.year:04d}", f"{br_dt.month:02d}", f"{br_dt.day:02d}")
                     os.makedirs(out_dir, exist_ok=True)
-
-                    base = os.path.splitext(os.path.basename(nc_path))[0]
-                    jpeg_path = os.path.join(out_dir, base + '.jpg')
+                    jpeg_path = os.path.join(out_dir, os.path.splitext(os.path.basename(nc_path))[0] + '.jpg')
                     fig.savefig(jpeg_path, format='jpeg')
                     plt.close(fig)
 
@@ -203,7 +179,6 @@ while True:
                     logging.info(f"Processed {nc_path} → {jpeg_path}")
 
                 except Exception:
-                    logging.exception(f"Failed processing {nc_path}")
+                    logging.exception(f"Error processing {nc_path}")
     except Exception:
-        logging.exception("Unexpected error in main loop")
-    time.sleep(SLEEP_SECONDS)
+        logging.exception("Fatal error in main loop")
