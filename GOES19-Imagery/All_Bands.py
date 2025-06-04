@@ -34,11 +34,11 @@ def reflectance_cmap(name):
         (0.0, "#000000"), (1.0, "#FFFFFF")
     ])
 
-cmap_band07 = mcolors.LinearSegmentedColormap.from_list("Band07", [
-    (-90, "#00FFFF"),
-    (-20, "#000000"),
-    (100, "#FFFFFF")
-], N=256)
+cmap_band07 = mcolors.LinearSegmentedColormap.from_list(
+    "Band07",
+    ["#00FFFF", "#000000", "#FFFFFF"],
+    N=256,
+)
 
 temps_8_10 = [-90, -80, -70, -60, -50, -40, -35, -30, -25, -20, -15, -10, -5, -2.5, 0]
 colors_8_10 = [
@@ -120,7 +120,10 @@ while True:
                     ds = GOES.open_dataset(nc_path)
                     CMI, Lon, Lat = ds.image('CMI', lonlat='corner', domain=DOMAIN)
                     data = CMI.data.astype(float)
-                    if band_num >= 7: data -= 273.15
+                    if band_num >= 7:
+                        data -= 273.15
+                    else:
+                        data *= 100
 
                     cmap = cmap_lookup[band_num]
                     vmin, vmax = vmin_vmax[band_num]
