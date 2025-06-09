@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
@@ -20,12 +22,23 @@ import GOES
 INCOMING_DIR  = r"E:\teste1"
 ORGANIZED_DIR = r"E:\GOES-Organized"
 LOGO_LEFT     = r"C:\Users\ire0034\Downloads\AssVisual_LAMCE\assVisual_LAMCE_COR_SemTextoTransparente.png"
-LOGO_RIGHT    = r"C:\Users\ire0034\Downloads\BaiaDigital\BaiaDigital-02.png"
+LOGO_RIGHT    = r"C:\Users\ire0034\Downloads\BaiaDigital\BaiaDigital-03.png"
 DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
-SLEEP_SECONDS = 600
+CHECK_INTERVAL = 60  # segundos entre varreduras
 
 # Logging
-logging.basicConfig(filename='goes_loop.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+LOG_PATH = os.path.abspath("goes_loop.log")
+logging.basicConfig(
+    filename=LOG_PATH,
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    filemode='a'  # ou 'w' se quiser sobrescrever toda vez
+)
+
+logging.info("Logger configurado e iniciado com sucesso.")
 
 # Parte 2: Colormaps exatos para cada banda
 def reflectance_cmap(name):
@@ -86,24 +99,49 @@ cmap_lookup = {
     14: cmap_ir_standard, 15: cmap_band15, 16: cmap_ir_standard
 }
 
-# Parte 3: Função de logo
-def add_logo(fig, logo_path, left=True, scale=0.12, alpha=1.0):
+# Parte 3: Função de logo modificada
+def add_logo_on_map(ax, logo_path, lon, lat, width_deg=5, anchor='bottom-left'):
+    """
+    Adiciona um logo georreferenciado ao mapa
+    - anchor: 'bottom-left' ou 'top-right' para controle da ancoragem
+    - width_deg: largura aproximada do logo em graus de longitude
+    """
     try:
-        logo = Image.open(logo_path)
-        dpi = fig.dpi
-        fig_w, fig_h = fig.get_size_inches()
-        th = int(fig_h * scale * dpi)
-        tw = int(th * (logo.width / logo.height))
-        logo = logo.resize((tw, th), Image.LANCZOS)
-        arr = np.array(logo)
-        margin = int(fig_w * dpi * 0.02)
-        xpos = margin if left else int(fig_w * dpi - tw - margin)
-        ypos = int((fig_h * dpi - th) / 2)
-        fig.figimage(arr, xo=xpos, yo=ypos, alpha=alpha, zorder=1000)
+        # Carrega o logo com transparência
+        logo = plt.imread(logo_path)
+        
+        # Calcula a proporção de aspecto
+        aspect_ratio = logo.shape[1] / logo.shape[0]
+        
+        # Calcula altura em graus de latitude
+        height_deg = width_deg / aspect_ratio
+        
+        # Calcula a extensão do logo
+        left = lon
+        right = lon + width_deg
+        bottom = lat
+        top = lat + height_deg
+        
+        # Ajusta a ancoragem
+        if anchor == 'top-right':
+            left = lon - width_deg
+            bottom = lat - height_deg
+            top = lat
+            right = lon
+        
+        # Exibe o logo como imagem georreferenciada
+        ax.imshow(
+            logo,
+            extent=(left, right, bottom, top),
+            transform=ccrs.PlateCarree(),
+            alpha=logo[:, :, 3] if logo.shape[2] == 4 else 1,  # Respeita transparência
+            origin='upper',
+            zorder=10
+        )
     except Exception as e:
-        logging.warning(f"Logo error: {e}")
+        logging.warning(f"Erro ao posicionar logo em ({lon}, {lat}): {e}")
 
-# Parte 4: Loop principal
+# Parte 4: Loop principal modificado
 while True:
     try:
         for band_folder in sorted(os.listdir(INCOMING_DIR)):
@@ -127,18 +165,28 @@ while True:
                     cmap = cmap_lookup[band_num]
                     vmin, vmax = vmin_vmax[band_num]
 
-                    fig = plt.figure(figsize=(14, 6), dpi=200, constrained_layout=True)
-                    gs = fig.add_gridspec(20, 24)
-                    ax = fig.add_subplot(gs[3:18, 4:20], projection=ccrs.PlateCarree())
+                    # Criar figura mais alta para caber melhor o título e colorbar
+                    fig = plt.figure(figsize=(12, 9), dpi=200)
+                    gs = fig.add_gridspec(nrows=20, ncols=24)
+
+                    # Subplot principal bem centralizado e maior
+                    ax = fig.add_subplot(gs[1:17, 2:22], projection=ccrs.PlateCarree())
                     ax.set_extent([DOMAIN[0]+360, DOMAIN[1]+360, DOMAIN[2], DOMAIN[3]])
+
+                    # Colorbar: logo abaixo do gráfico, mesmo comprimento horizontal
+                    cbar_ax = fig.add_subplot(gs[18, 2:22])
+
 
                     mesh = ax.pcolormesh(Lon.data, Lat.data, data, cmap=cmap,
                                          norm=mcolors.Normalize(vmin=vmin, vmax=vmax))
 
-                    cax = fig.add_subplot(gs[19, 4:20])
-                    cb = plt.colorbar(mesh, cax=cax, orientation='horizontal', extend='both')
+              
+
+                    cb = plt.colorbar(mesh, cax=cbar_ax, orientation='horizontal', extend='both')
+
                     cb.set_label('Brightness Temperature (°C)' if band_num >= 7 else 'Reflectance (%)', size=9)
                     cb.ax.tick_params(labelsize=8)
+
 
                     utc_dt = CMI.time_bounds.data[0]
                     if isinstance(utc_dt, np.datetime64):
@@ -160,19 +208,40 @@ while True:
 
                     ax.add_feature(cfeature.NaturalEarthFeature(
                         'cultural', 'admin_0_countries', '50m', facecolor='none'),
-                        edgecolor='red', linewidth=0.8)
+                        edgecolor='white', linewidth=0.8)
                     ax.gridlines(draw_labels=False, linestyle='--', alpha=0.7)
                     ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
                     ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
 
-                    add_logo(fig, LOGO_LEFT, left=True)
-                    add_logo(fig, LOGO_RIGHT, left=False)
+                    # POSICIONAMENTO DOS LOGOS MODIFICADOS
+                    # Logo LAMCE - canto inferior esquerdo (ajustado para esquerda)
+                    add_logo_on_map(
+                        ax, 
+                        LOGO_LEFT, 
+                        lon=DOMAIN[0] + 1.0,   # levemente mais para a esquerda
+                        lat=DOMAIN[2] + 1.5, 
+                        width_deg=13.5,
+                        anchor='bottom-left'
+                    )
+
+                    # Logo Baía Digital - canto superior direito (ajustado para cima/direita e menor)
+                    add_logo_on_map(
+                        ax, 
+                        LOGO_RIGHT, 
+                        lon=DOMAIN[1] - 1.0,   # levemente mais para a direita
+                        lat=DOMAIN[3] - 0.5,   # levemente mais para cima
+                        width_deg=14.5,
+                        anchor='top-right'
+                    )
 
                     out_dir = os.path.join(ORGANIZED_DIR, band_folder,
                                            f"{br_dt.year:04d}", f"{br_dt.month:02d}", f"{br_dt.day:02d}")
                     os.makedirs(out_dir, exist_ok=True)
-                    jpeg_path = os.path.join(out_dir, os.path.splitext(os.path.basename(nc_path))[0] + '.jpg')
-                    fig.savefig(jpeg_path, format='jpeg')
+                    timestamp_str = br_dt.strftime('%Y-%m-%d_%H-%M')
+                    jpeg_name = f'{timestamp_str}_Band{band_num:02d}_{os.path.basename(nc_path).replace(".nc", ".jpg")}'
+                    jpeg_path = os.path.join(out_dir, jpeg_name)
+
+                    fig.savefig(jpeg_path, format='jpeg', bbox_inches='tight')
                     plt.close(fig)
 
                     del ds
@@ -184,3 +253,4 @@ while True:
                     logging.exception(f"Error processing {nc_path}")
     except Exception:
         logging.exception("Fatal error in main loop")
+    time.sleep(CHECK_INTERVAL)
