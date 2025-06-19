@@ -5,7 +5,6 @@ import glob
 import logging
 import gc
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,7 +18,7 @@ from PIL import Image
 import GOES
 
 # Diretórios
-INCOMING_DIR  = r"E:\teste1"
+INCOMING_DIR  = r"E:\incoming\GOES-R-CMI-Imagery"
 ORGANIZED_DIR = r"E:\GOES-Organized"
 LOGO_LEFT     = r"C:\Users\ire0034\Downloads\AssVisual_LAMCE\assVisual_LAMCE_COR_SemTextoTransparente.png"
 LOGO_RIGHT    = r"C:\Users\ire0034\Downloads\BaiaDigital\BaiaDigital-03.png"
@@ -191,20 +190,20 @@ while True:
                     utc_dt = CMI.time_bounds.data[0]
                     if isinstance(utc_dt, np.datetime64):
                         utc_dt = datetime.strptime(str(utc_dt)[:19], '%Y-%m-%dT%H:%M:%S')
-                    if not hasattr(utc_dt, 'tzinfo'):
+                    if utc_dt.tzinfo is None or utc_dt.tzinfo.utcoffset(utc_dt) is None:
                         utc_dt = utc_dt.replace(tzinfo=timezone.utc)
-                    br_dt = utc_dt.astimezone(ZoneInfo('America/Sao_Paulo'))
 
                     band_id = ds.variable('band_id').data[0]
                     wl = ds.variable('band_wavelength').data[0]
                     product = colormaps.get(band_num, "Unknown")
 
                     fig.suptitle(
-                        f'{ds.attribute("platform_ID")} - Band {band_id:02d}: {product}\n'
-                        f'{br_dt.strftime("%Y-%m-%d %H:%M BRT")}\n'
-                        f'{wl:.1f} µm',
-                        y=0.98, fontsize=8, linespacing=1.5
-                    )
+                    f'{ds.attribute("platform_ID")} - Band {band_id:02d}: {product}\n'
+                    f'{utc_dt.strftime("%Y-%m-%d %H:%M UTC")}\n'
+                    f'{wl:.1f} µm',
+                    y=0.98, fontsize=8, linespacing=1.5
+                )
+
 
                     ax.add_feature(cfeature.NaturalEarthFeature(
                         'cultural', 'admin_0_countries', '50m', facecolor='none'),
@@ -235,11 +234,12 @@ while True:
                     )
 
                     out_dir = os.path.join(ORGANIZED_DIR, band_folder,
-                                           f"{br_dt.year:04d}", f"{br_dt.month:02d}", f"{br_dt.day:02d}")
-                    os.makedirs(out_dir, exist_ok=True)
-                    timestamp_str = br_dt.strftime('%Y-%m-%d_%H-%M')
+                       f"{utc_dt.year:04d}", f"{utc_dt.month:02d}", f"{utc_dt.day:02d}")
+                    timestamp_str = utc_dt.strftime('%Y-%m-%d_%H-%M')
+
                     jpeg_name = f'{timestamp_str}_Band{band_num:02d}_{os.path.basename(nc_path).replace(".nc", ".jpg")}'
                     jpeg_path = os.path.join(out_dir, jpeg_name)
+                    os.makedirs(os.path.dirname(jpeg_path), exist_ok=True)
 
                     fig.savefig(jpeg_path, format='jpeg', bbox_inches='tight')
                     plt.close(fig)
@@ -253,4 +253,11 @@ while True:
                     logging.exception(f"Error processing {nc_path}")
     except Exception:
         logging.exception("Fatal error in main loop")
+    try:
+        import subprocess
+        powershell_script = r"E:\scripts\sync_goes_to_nas.ps1"
+        subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", powershell_script])
+        logging.info("Sincronização com NAS concluída com sucesso.")
+    except Exception as e:
+        logging.exception(f"Erro ao sincronizar com o NAS: {e}")
     time.sleep(CHECK_INTERVAL)
