@@ -5,7 +5,7 @@ import glob
 import logging
 import gc
 from datetime import datetime, timezone
-
+import shutil 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -16,6 +16,22 @@ import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from PIL import Image
 import GOES
+
+def check_nas_space(path, min_gb_free=10):
+    """
+    Verifica o espaço livre no NAS. Retorna True se tiver espaço suficiente.
+    """
+    try:
+        total, used, free = shutil.disk_usage(path)
+        free_gb = free / (1024 ** 3)
+        if free_gb < min_gb_free:
+            logging.warning(f"NAS com pouco espaço livre: {free_gb:.2f} GB disponíveis (mínimo exigido: {min_gb_free} GB).")
+            return False
+        return True
+    except Exception as e:
+        logging.error(f"Erro ao verificar espaço do NAS ({path}): {e}")
+        return False
+
 
 # Diretórios
 INCOMING_DIR  = r"E:\incoming\GOES-R-CMI-Imagery"
@@ -142,6 +158,7 @@ def add_logo_on_map(ax, logo_path, lon, lat, width_deg=5, anchor='bottom-left'):
 
 # Parte 4: Loop principal modificado
 while True:
+    logging.info("Iniciando nova varredura de arquivos...")
     try:
         for band_folder in sorted(os.listdir(INCOMING_DIR)):
             band_path = os.path.join(INCOMING_DIR, band_folder)
@@ -232,9 +249,9 @@ while True:
                         width_deg=14.5,
                         anchor='top-right'
                     )
-
                     out_dir = os.path.join(ORGANIZED_DIR, band_folder,
-                       f"{utc_dt.year:04d}", f"{utc_dt.month:02d}", f"{utc_dt.day:02d}")
+                        f"{utc_dt.year:04d}", f"{utc_dt.month:02d}", f"{utc_dt.day:02d}")
+
                     timestamp_str = utc_dt.strftime('%Y-%m-%d_%H-%M')
 
                     jpeg_name = f'{timestamp_str}_Band{band_num:02d}_{os.path.basename(nc_path).replace(".nc", ".jpg")}'
@@ -256,8 +273,17 @@ while True:
     try:
         import subprocess
         powershell_script = r"E:\scripts\sync_goes_to_nas.ps1"
-        subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", powershell_script])
+        subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-File", powershell_script],
+            check=True,
+            timeout=60  # tempo máximo de execução em segundos
+        )
         logging.info("Sincronização com NAS concluída com sucesso.")
+    except subprocess.TimeoutExpired:
+        logging.warning("Sincronização com NAS expirou por timeout (possivelmente travada no robocopy).")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Falha na execução do script PowerShell: código de saída {e.returncode}")
     except Exception as e:
-        logging.exception(f"Erro ao sincronizar com o NAS: {e}")
+        logging.exception(f"Erro inesperado ao sincronizar com o NAS: {e}")
+
     time.sleep(CHECK_INTERVAL)
