@@ -39,6 +39,7 @@ ORGANIZED_DIR = r"E:\GOES-Organized"
 LOGO_LEFT     = r"C:\Users\ire0034\Downloads\AssVisual_LAMCE\assVisual_LAMCE_COR_SemTextoTransparente.png"
 LOGO_RIGHT    = r"C:\Users\ire0034\Downloads\BaiaDigital\BaiaDigital-03.png"
 DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
+DOMAIN_SUDESTE = [-54.0, -38.0, -27.5, -13.0]
 CHECK_INTERVAL = 60  # segundos entre varreduras
 
 # Logging
@@ -155,7 +156,6 @@ def add_logo_on_map(ax, logo_path, lon, lat, width_deg=5, anchor='bottom-left'):
         )
     except Exception as e:
         logging.warning(f"Erro ao posicionar logo em ({lon}, {lat}): {e}")
-
 # Parte 4: Loop principal modificado
 while True:
     logging.info("Iniciando nova varredura de arquivos...")
@@ -225,6 +225,7 @@ while True:
                     ax.add_feature(cfeature.NaturalEarthFeature(
                         'cultural', 'admin_0_countries', '50m', facecolor='none'),
                         edgecolor='white', linewidth=0.8)
+                    
                     ax.gridlines(draw_labels=False, linestyle='--', alpha=0.7)
                     ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
                     ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
@@ -254,17 +255,73 @@ while True:
 
                     timestamp_str = utc_dt.strftime('%Y-%m-%d_%H-%M')
 
-                    jpeg_name = f'{timestamp_str}_Band{band_num:02d}_{os.path.basename(nc_path).replace(".nc", ".jpg")}'
-                    jpeg_path = os.path.join(out_dir, jpeg_name)
+                    jpeg_name = f'{timestamp_str}_Band{band_num:02d}_Brasil_{os.path.basename(nc_path).replace(".nc", "")}.jpg'
+                    jpeg_path = os.path.join(out_dir, 'Brasil', jpeg_name)
                     os.makedirs(os.path.dirname(jpeg_path), exist_ok=True)
-
                     fig.savefig(jpeg_path, format='jpeg', bbox_inches='tight')
                     plt.close(fig)
+                    # --- GERAÇÃO DO MAPA PARA A REGIÃO SUDESTE ---
+                    fig = plt.figure(figsize=(12, 9), dpi=200)
+                    gs = fig.add_gridspec(nrows=20, ncols=24)
+                    ax = fig.add_subplot(gs[1:17, 2:22], projection=ccrs.PlateCarree())
+                    ax.set_extent([DOMAIN_SUDESTE[0]+360, DOMAIN_SUDESTE[1]+360, DOMAIN_SUDESTE[2], DOMAIN_SUDESTE[3]])
+                    cbar_ax = fig.add_subplot(gs[18, 2:22])
+
+                    mesh = ax.pcolormesh(Lon.data, Lat.data, data, cmap=cmap,
+                                        norm=mcolors.Normalize(vmin=vmin, vmax=vmax))
+                    cb = plt.colorbar(mesh, cax=cbar_ax, orientation='horizontal', extend='both')
+                    cb.set_label('Brightness Temperature (°C)' if band_num >= 7 else 'Reflectance (%)', size=9)
+                    cb.ax.tick_params(labelsize=8)
+
+                    fig.suptitle(
+                        f'{ds.attribute("platform_ID")} - Band {band_id:02d}: {product}\n'
+                        f'{utc_dt.strftime("%Y-%m-%d %H:%M UTC")}\n'
+                        f'{wl:.1f} µm',
+                        y=0.98, fontsize=8, linespacing=1.5
+                    )
+
+                    ax.add_feature(cfeature.NaturalEarthFeature(
+                        'cultural', 'admin_0_countries', '50m', facecolor='none'),
+                        edgecolor='white', linewidth=0.8)
+                    ax.add_feature(cfeature.STATES, edgecolor='white', linewidth=0.5)
+                    ax.gridlines(draw_labels=False, linestyle='--', alpha=0.7)
+                    ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
+                    ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
+
+                    # Logos posicionados da mesma forma no Sudeste
+                    add_logo_on_map(
+                        ax, 
+                        LOGO_LEFT, 
+                        lon=DOMAIN_SUDESTE[0] + 1.0,   
+                        lat=DOMAIN_SUDESTE[2] + 1.5, 
+                        width_deg=4.5,
+                        anchor='bottom-left'
+                    )
+                    add_logo_on_map(
+                        ax, 
+                        LOGO_RIGHT, 
+                        lon=DOMAIN_SUDESTE[1] - 1.0,   
+                        lat=DOMAIN_SUDESTE[3] - 0.5,   
+                        width_deg=5.5,
+                        anchor='top-right'
+                    )
+
+                    # Pasta Sudeste
+                    jpeg_sudeste_name = f'{timestamp_str}_Band{band_num:02d}_Sudeste_{os.path.basename(nc_path).replace(".nc", "")}.jpg'
+                    jpeg_sudeste_dir = os.path.join(out_dir, 'Sudeste')
+                    os.makedirs(jpeg_sudeste_dir, exist_ok=True)
+                    jpeg_sudeste_path = os.path.join(jpeg_sudeste_dir, jpeg_sudeste_name)
+                    fig.savefig(jpeg_sudeste_path, format='jpeg', bbox_inches='tight')
+                    plt.close(fig)
+
 
                     del ds
                     gc.collect()
-                    os.rename(nc_path, os.path.join(out_dir, os.path.basename(nc_path)))
-                    logging.info(f"Processed {nc_path} → {jpeg_path}")
+                    nc_dest = os.path.join(out_dir, "NetCDF")
+                    os.makedirs(nc_dest, exist_ok=True)
+                    os.rename(nc_path, os.path.join(nc_dest, os.path.basename(nc_path)))
+
+                    logging.info(f"Processado NetCDF: {nc_path} → JPEGs: {jpeg_path}, {jpeg_sudeste_path}")
 
                 except Exception:
                     logging.exception(f"Error processing {nc_path}")
