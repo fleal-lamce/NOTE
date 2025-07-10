@@ -1,0 +1,13 @@
+from django.db import models
+from django.utils import timezone
+
+
+class Log(models.Model):
+    id = models.AutoField(primary_key=True, unique=True, editable=False)
+    esp_id = models.CharField(max_length=12, default='')
+    data   = models.JSONField(default={}) 
+    date = models.DateTimeField(default=timezone.now, editable=False)
+
+    def __str__(self):
+        return f'Log {self.id} | ESP {self.esp_id} | {timezone.localtime(self.date):%Y-%m-%d %H:%M:%S}'
+    
