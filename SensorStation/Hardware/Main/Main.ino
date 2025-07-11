@@ -8,26 +8,26 @@
 #include "objects/logs/index.h"
 #include "objects/sensors/index.h"
 #include "objects/utils/notes/index.h"
-#include "objects/telemetry/lora/index.h"
-#include "objects/telemetry/espnow/index.h"
+#include "objects/telemetry/heltec/index.h"
 
 
 void setup(){
     Serial.begin(115200);
+    delay(2000);
     device.setup();
+    logs.setup();
     server.connect("Klauss", "Marchi12345@");
-    device.islora ? lora.setup() : espnow.setup();
+    heltec.setup();
     sensors.setup();
     Serial.println("Setup Complete");
 }
 
 void loop(){
     tasks.print();
+    logs.handle();
+    sensors.handle();
     server.handle();
     server.check();
     routes.handle();
-    sensors.handle();
-    routes.handle();
-    logs.handle();
 }
 

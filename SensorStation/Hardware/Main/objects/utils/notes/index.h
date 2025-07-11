@@ -10,7 +10,9 @@ class Notes{
 
     Notes(const char* PATH_NAME){
         path = PATH_NAME;
+    }
 
+    void setup(){
         if(LittleFS.begin()){
             Serial.println("LittleFS montado com sucesso!");
             return;

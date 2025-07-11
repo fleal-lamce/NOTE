@@ -6,8 +6,7 @@
 #include "../../globals/variables.h"
 #include "../../globals/functions.h"
 #include "../device/index.h"
-#include "../telemetry/lora/index.h"
-#include "../telemetry/espnow/index.h"
+#include "../telemetry/heltec/index.h"
 #include "../utils/listener/index.h"
 #include "dhtsensor/index.h"
 
@@ -21,7 +20,7 @@ class Sensors{
     }
 
     void update(){
-        dhtsensor.update();
+        //dhtsensor.update();
 
         data.temperature = dhtsensor.temperature.value;
         data.humidity    = dhtsensor.humidity.value;
@@ -33,9 +32,9 @@ class Sensors{
 
         if(!listener.ready() || device.master)
             return;
-
+            
         update();
-        device.islora ? lora.send(data) : espnow.send(data);
+        heltec.send(data);
     }
 };
 

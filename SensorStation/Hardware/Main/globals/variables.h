@@ -4,12 +4,6 @@
 #include <ArduinoJson.h>
 
 
-struct Variables{
-    const char* firmware  = "v1.0.0";
-    const bool temp_debug = false;
-    const bool serial_debug = false;
-};
-
 struct __attribute__((packed)) DeviceData{
     char id[12];
     uint8_t area = 3;
@@ -17,6 +11,12 @@ struct __attribute__((packed)) DeviceData{
     uint8_t humidity; 
     int16_t sodium; 
     int16_t potassium; 
+};
+
+struct Variables{
+    const char* firmware  = "v1.0.0";
+    const bool temp_debug = false;
+    const bool serial_debug = false;
 };
 
 inline Variables vars;

@@ -34,7 +34,7 @@ class EspLora{
         SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI);
         LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
 
-        if(!LoRa.begin(LORA_FREQ)){
+        if(!begin(LORA_FREQ)){
             Serial.println("LoRa init failed");
             return;
         }

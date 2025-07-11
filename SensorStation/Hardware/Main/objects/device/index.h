@@ -11,8 +11,7 @@
 
 class Device{
     public:
-    const bool master = false;
-    const bool islora = false;
+    const bool master = true;
     Settings settings;
     Text<12> id;
     unsigned long startTime;

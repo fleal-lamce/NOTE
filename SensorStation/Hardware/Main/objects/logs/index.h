@@ -8,9 +8,8 @@
 #include "../device/index.h"
 #include "../utils/notes/index.h"
 #include "../server/index.h"
-#include "../telemetry/lora/index.h"
-#include "../telemetry/espnow/index.h"
 #include "../sensors/index.h"
+#include "../telemetry/heltec/index.h"
 
 #define REQUEST_SIZE  (1024) 
 #define LOGS_SIZE     (REQUEST_SIZE - 50)
@@ -31,6 +30,12 @@ class Logs{
     public:
     Notes notes = Notes("/logs.txt");
 
+    void setup(){
+        Serial.println("Setting Up Notes");
+        delay(2000);
+        notes.setup();
+    }
+
     void handle(){
         update();
         upload();
@@ -44,11 +49,8 @@ class Logs{
         
         if(!device.master)
             return;
-
-        if(device.islora && lora.get(sensors.data))
-            return send();
-
-        if(!device.islora && espnow.get(sensors.data))
+        
+        if(heltec.get(sensors.data))
             return send();
     }
 
