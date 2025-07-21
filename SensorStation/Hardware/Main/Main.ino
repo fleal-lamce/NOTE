@@ -7,27 +7,29 @@
 #include "objects/server/routes.h"
 #include "objects/logs/index.h"
 #include "objects/sensors/index.h"
-#include "objects/utils/notes/index.h"
 #include "objects/telemetry/heltec/index.h"
 
 
 void setup(){
     Serial.begin(115200);
     delay(2000);
-    device.setup();
-    logs.setup();
-    server.connect("Klauss", "Marchi12345@");
+    device.setup(); 
     heltec.setup();
+    
+    if(device.master){
+        server.connect("Klauss", "Marchi12345@");
+        logs.setup();
+        return;
+    }
+    
     sensors.setup();
-    Serial.println("Setup Complete");
 }
 
 void loop(){
-    tasks.print();
     logs.handle();
-    sensors.handle();
-    server.handle();
-    server.check();
-    routes.handle();
-}
 
+    if(device.master)
+        tasks.master();
+    else
+        tasks.slave();
+}

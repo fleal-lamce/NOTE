@@ -3,19 +3,18 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <LoRa.h>
-#include "../../../globals/constants.h"
-#include "../../../globals/variables.h"
-#include "../../../globals/functions.h"
+#include "../../../globals/dataset/index.h"
+
 
 // ———————————————————— CONFIGURAÇÃO LORA ————————————————————
-#define LORA_SCK      5
-#define LORA_MISO     19
-#define LORA_MOSI     27
-#define LORA_SS       18
-#define LORA_RST      14
-#define LORA_DIO0     26
+#define LORA_SCK  5
+#define LORA_MISO 19
+#define LORA_MOSI 27
+#define LORA_SS   18
+#define LORA_RST  14
+#define LORA_DIO0 26
 
-#define LORA_FREQ     868000000UL
+#define LORA_FREQ     915000000
 #define LORA_SF       12
 #define LORA_BW       125E3
 #define LORA_CR       7

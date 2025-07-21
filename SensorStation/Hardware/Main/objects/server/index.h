@@ -7,8 +7,8 @@
 #include "../../globals/variables.h"
 #include "../../globals/functions.h"
 #include "../device/index.h"
-#include "../utils/text/index.h"
-#include "../utils/listener/index.h"
+#include "../../utils/text/index.h"
+#include "../../utils/listener/index.h"
 
 
 class EspServer{
@@ -23,7 +23,7 @@ class EspServer{
     void handle(){
         static Listener listener(50);
 
-        if(!listener.ready())
+        if(!listener.ready() || !device.master)
             return;
         
         client = server.available();
@@ -41,11 +41,14 @@ class EspServer{
 
     void check(){
         static Listener listener(30000);
-
-        if(!listener.ready())
+        
+        if(!listener.ready() || !device.master)
             return;
         
-        active = (get("check/") == "OK");
+        Text<32> response;
+        response.concat(get("check/")); 
+
+        active = response.contains("OK");
         Serial.println("server status: " + String(active));
     }
 

@@ -4,14 +4,16 @@ from django.urls import path
 from rest_framework.decorators import action
 from django.http import HttpResponse
 from Utils.API import api
-import json
+import json, orjson
+
+from Routes.Graphs import *
 
 
 @csrf_exempt
 @action(detail=False, methods=['get'], url_path='replace')
 def onCheckRequest(request):
     print(request.body)
-    return HttpResponse('OK', content_type='text/plain')
+    return HttpResponse(orjson.dumps({'status': 'success', 'data': 'OK'}), content_type='application/json')
 
 @csrf_exempt
 @action(detail=False, methods=['post'], url_path='replace')
@@ -34,4 +36,5 @@ urlpatterns = [
     path('api/check/', onCheckRequest),
     path('api/rows/', onRowsRequest),
     path('api/add/', onAddRequest),
+    path('api/graph/', onGraphRequest)
 ]

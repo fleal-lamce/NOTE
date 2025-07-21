@@ -4,8 +4,7 @@
 #include "../../globals/constants.h"
 #include "../../globals/variables.h"
 #include "../../globals/functions.h"
-#include "../utils/text/index.h"
-#include "../utils/json/index.h"
+#include "../../utils/text/index.h"
 #include "settings.h"
 
 

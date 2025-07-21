@@ -4,22 +4,25 @@
 #include "../../globals/constants.h"
 #include "../../globals/variables.h"
 #include "../../globals/functions.h"
-#include "../device/settings.h"
-#include "../utils/text/index.h"
-#include "../utils/json/index.h"
-#include "../device/index.h"
-#include "../utils/listener/index.h"
+#include "../../utils/listener/index.h"
+
+#include "../server/index.h"
+#include "../server/routes.h"
+#include "../logs/index.h"
+#include "../sensors/index.h"
 
 
 class Tasks{
     public:
 
-    void print(){
-        static Listener listener(5000);
-        
-        if(!listener.ready())
-            return;
-        
+    void master(){
+        server.handle();
+        server.check();
+        routes.handle();
+    }
+
+    void slave(){
+        sensors.handle();
     }
 };
 

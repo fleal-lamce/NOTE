@@ -2,29 +2,32 @@
 #define SENSORS_H
 #include <Arduino.h>
 #include <Arduino.h>
-#include "../../globals/constants.h"
-#include "../../globals/variables.h"
-#include "../../globals/functions.h"
+#include "../../globals/dataset/index.h"
 #include "../device/index.h"
-#include "../telemetry/heltec/index.h"
-#include "../utils/listener/index.h"
-#include "dhtsensor/index.h"
+#include "../../utils/listener/index.h"
+#include "DHT22/index.h"
+#include "SHT30/index.h"
 
 
 class Sensors{
     public:
-    DeviceData data;
-    
+    DHTSensor dht = DHTSensor(36);
+    SHT30 sht = SHT30(45, 46);
+    bool available;
+
     void setup(){
-        strncpy(data.id, device.id.buffer, device.id.index);
+        dataset.setID(device.id.get());
+        dht.setup();
+        sht.setup();
     }
 
     void update(){
-        //dhtsensor.update();
+        dht.update();
+        sht.update();
 
-        data.temperature = dhtsensor.temperature.value;
-        data.humidity    = dhtsensor.humidity.value;
-        Serial.println(dhtsensor.temperature.toString());
+        dataset.info.temperature = sht.temperature; //dht.temperature.value;
+        dataset.info.humidity    = sht.humidity;    //dht.humidity.value;
+        available = true;
     }
 
     void handle(){
@@ -32,9 +35,8 @@ class Sensors{
 
         if(!listener.ready() || device.master)
             return;
-            
+           
         update();
-        heltec.send(data);
     }
 };
 

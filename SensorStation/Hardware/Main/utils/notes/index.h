@@ -97,37 +97,38 @@ class Notes{
         String result = "";
         for(int i = 0; i < n && file.available(); i++){
             String line = file.readStringUntil('\n');
+
             if(line.endsWith("\r"))
                 line.remove(line.length() - 1);
+
             result += line;
+            
             if(i < n - 1)
                 result += '\n';
         }
-
+        
+        result.trim();
         file.close();
         return result;
     }
     
-    void droplines(int n){
+    bool droplines(int n){
         File file = LittleFS.open(path, FILE_READ);
         if(!file){
             Serial.println("Erro ao abrir o arquivo para leitura em droplines");
-            return;
+            return false;
         }
 
         File temp = LittleFS.open("/temp.txt", FILE_WRITE);
         if(!temp){
             Serial.println("Erro ao criar o arquivo temporário em droplines");
             file.close();
-            return;
+            return false;
         }
 
-        // pula n linhas
-        for(int i = 0; i < n && file.available(); i++){
+        for(int i = 0; i < n && file.available(); i++)
             file.readStringUntil('\n');
-        }
-
-        // copia o resto para o temp
+        
         const size_t bufferSize = 512;
         uint8_t buffer[bufferSize];
         while(file.available()){
@@ -137,10 +138,9 @@ class Notes{
 
         file.close();
         temp.close();
-
-        // substitui o original pelo temp
         LittleFS.remove(path);
         LittleFS.rename("/temp.txt", path);
+        return true;
     }
 };
 

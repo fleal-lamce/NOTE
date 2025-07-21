@@ -1,18 +1,19 @@
 #ifndef HELTEC_H
 #define HELTEC_H
-#include "../../../globals/variables.h"
+#include "../../../globals/dataset/index.h"
 #include "../../device/index.h"
 #include "LoRaWan_APP.h"
 
-#define RF_FREQUENCY           915000000 // Hz
-#define TX_OUTPUT_POWER        14        // dBm
-#define LORA_BANDWIDTH         0         // 125 kHz
-#define LORA_SPREADING_FACTOR  7         // SF7
-#define LORA_CODINGRATE        1         // 4/5
-#define LORA_PREAMBLE_LENGTH   8
-#define TX_TIMEOUT_MS          2000      // tempo máximo para esperar TxDone
+#define RF_FREQUENCY 915000000   // Hz
+#define TX_OUTPUT_POWER 14       // dBm
+#define LORA_BANDWIDTH  0        // 125 kHz
+#define LORA_SPREADING_FACTOR 7  // SF7
+#define LORA_CODINGRATE       1  // 4/5
+#define LORA_PREAMBLE_LENGTH  8
+#define TX_TIMEOUT_MS 2000 // tempo máximo para esperar TxDone
 
-class HeltecLora {
+
+class HeltecLora{
     public:
     volatile bool available = false;
     static RadioEvents_t radioEvents;
