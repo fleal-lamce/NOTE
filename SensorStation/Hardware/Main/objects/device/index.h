@@ -10,7 +10,7 @@
 
 class Device{
     public:
-    const bool master = true;
+    const bool master = false;
     Settings settings;
     Text<12> id;
     unsigned long startTime;

@@ -9,8 +9,8 @@ struct __attribute__((packed)) DeviceData{
     uint8_t area = 1;
     int16_t temperature;
     uint8_t humidity; 
-    int16_t sodium; 
-    int16_t potassium; 
+    int16_t velocity; 
+    int16_t direction; 
 };
 
 class Dataset{
@@ -29,8 +29,11 @@ class Dataset{
 
         variables["temperature"] = info.temperature;
         variables["humidity"]    = info.humidity;
-
+        variables["direction"]   = info.direction;
+        variables["velocity"]    = info.velocity;
+        
         log["esp_id"] = info.id;
+        log["area"]   = info.area;
         log["data"]   = variables;
 
         request["table"] = "logs";

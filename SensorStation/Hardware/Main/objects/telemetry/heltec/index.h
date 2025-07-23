@@ -55,7 +55,7 @@ class HeltecLora{
         Radio.Send((uint8_t*)&txData, sizeof(txData));
 
         const unsigned long startTime = device.time();
-        while(!radioIdle && (millis() - startTime < TX_TIMEOUT_MS))
+        while(!radioIdle && (device.time() - startTime < TX_TIMEOUT_MS))
             Radio.IrqProcess();
 
         if(radioIdle)
@@ -100,5 +100,4 @@ class HeltecLora{
 HeltecLora*  HeltecLora::instance = nullptr;
 RadioEvents_t HeltecLora::radioEvents;
 inline HeltecLora heltec;
-
 #endif

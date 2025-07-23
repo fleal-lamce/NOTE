@@ -14,7 +14,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    'Tables.Logs'
+    'Tables.Logs',
+    'Tables.Devices',
 ]
 
 MIDDLEWARE = [

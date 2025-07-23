@@ -8,17 +8,6 @@
 #include "../server/index.h"
 
 
-/*
-REQUEST FORMAT (SERVER)
-{
-    "table": "logs",
-    "data": {
-        "esp_id": "MICTALTALTAL",
-        "data":  "{a: 1, b: 2, c: 3}"
-    }
-}
-*/
-
 class Logs{
     public:
     Notes notes = Notes("/txt");
@@ -45,7 +34,7 @@ class Logs{
 
         if(!sensors.available)
             return;
-
+        
         heltec.send(dataset.info); 
         sensors.available = false;
         Serial.println("(log) sent: " + dataset.toString());

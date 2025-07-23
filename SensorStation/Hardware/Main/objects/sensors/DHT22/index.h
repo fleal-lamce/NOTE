@@ -4,99 +4,103 @@
 #include <DHT.h>
 #include "../../../globals/variables.h"
 #include "../../device/index.h"
-#define SAMPLE_TIME 800
+#include "../../../utils/listener/index.h"
+
+#define SAMPLE_TIME 200
+#define USE_SAMPLE  true
 
 
-class Temperature {
-    public:
-    float value; 
-    bool working;
-    DHT& dht;
+class DHTSensor{  
+    private:
+    class Temperature{
+        public:
+        float value; 
+        bool working;
+        DHT& dht;
 
-    Temperature(DHT& dhtobject): 
-        dht(dhtobject){}
+        Temperature(DHT& _dht): 
+            dht(_dht){}
 
-    void update(){
-        value = sample(SAMPLE_TIME);
-        working = (value != 999);
-    }
+        void update(){
+            value   = sample(SAMPLE_TIME);
+            working = (value != 999);
+        }
 
-    float get(){
-        float current = dht.readTemperature();
+        float get(){
+            float current = dht.readTemperature();
 
-        if (vars.temp_debug)
-            current = 25.0;
+            if (vars.temp_debug)
+                current = 25.0;
 
-        if (isnan(current) || abs(current) > 100)
-            return 999;
-
-        return current;
-    }
-
-    float sample(const int timeout){
-        const unsigned long startTime = device.time();
-
-        while (device.time() - startTime < timeout) {
-            const float current = get();
-
-            if (current == 999)
-                continue;
+            if (isnan(current) || abs(current) > 100)
+                return 999;
 
             return current;
         }
 
-        return 999;
-    }
+        float sample(const int timeout){
+            const unsigned long startTime = device.time();
 
-    String toString(){
-        return String(value) + " ºC";
-    }
-};
+            while (device.time() - startTime < timeout) {
+                const float current = get();
 
-class Humidity{
-    public:
-    float value;
-    bool working;
-    DHT& dht;
+                if (current == 999)
+                    continue;
 
-    Humidity(DHT& dhtobject): 
-        dht(dhtobject){}
+                return current;
+            }
 
-    void update(){
-        value = sample(SAMPLE_TIME);
-        working = (value != 999);
-    }
-
-    float get(){
-        float current = dht.readHumidity();
-
-        if (isnan(current) || abs(current) > 100)
             return 999;
+        }
 
-        return current;
-    }
+        String toString(){
+            return String(value) + " ºC";
+        }
+    };
 
-    float sample(const int timeout){
-        const unsigned long startTime = device.time();
+    class Humidity{
+        public:
+        float value;
+        bool working;
+        DHT& dht;
 
-        while (device.time() - startTime < timeout) {
-            const float current = get();
+        Humidity(DHT& _dht): 
+            dht(_dht){}
 
-            if (current == 999)
-                continue;
+        void update(){
+            value   = sample(SAMPLE_TIME);
+            working = (value != 999);
+        }
+
+        float get(){
+            float current = dht.readHumidity();
+
+            if (isnan(current) || abs(current) > 100)
+                return 999;
 
             return current;
         }
 
-        return 999;
-    }
+        float sample(const int timeout){
+            const unsigned long startTime = device.time();
 
-    String toString(){
-        return String(value) + "%";
-    }
-};
+            while (device.time() - startTime < timeout) {
+                const float current = get();
 
-class DHTSensor {
+                if (current == 999)
+                    continue;
+
+                return current;
+            }
+
+            return 999;
+        }
+
+        String toString(){
+            return String(value) + "%";
+        }
+    };
+
     public:
     DHT dht;
     Temperature temperature = Temperature(dht);
@@ -110,7 +114,12 @@ class DHTSensor {
         delay(2000); 
     }
 
-    void update() {
+    void handle(){
+        static Listener listener = Listener(5000);
+
+        if(!listener.ready())
+            return;
+
         temperature.update();
         humidity.update();
     }

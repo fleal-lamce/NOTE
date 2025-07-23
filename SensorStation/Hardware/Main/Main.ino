@@ -18,18 +18,17 @@ void setup(){
     
     if(device.master){
         server.connect("Klauss", "Marchi12345@");
-        logs.setup();
-        return;
+        return logs.setup();
     }
     
     sensors.setup();
 }
 
 void loop(){
-    logs.handle();
-
     if(device.master)
         tasks.master();
     else
         tasks.slave();
+
+    logs.handle();
 }

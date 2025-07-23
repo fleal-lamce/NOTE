@@ -7,36 +7,36 @@
 #include "../../utils/listener/index.h"
 #include "DHT22/index.h"
 #include "SHT30/index.h"
-
+#include "WIND/index.h"
 
 class Sensors{
     public:
+    WindStation windstation = WindStation(41, 42);
     DHTSensor dht = DHTSensor(36);
     SHT30 sht = SHT30(45, 46);
     bool available;
 
     void setup(){
         dataset.setID(device.id.get());
-        dht.setup();
+        //dht.setup();
         sht.setup();
-    }
-
-    void update(){
-        dht.update();
-        sht.update();
-
-        dataset.info.temperature = sht.temperature; //dht.temperature.value;
-        dataset.info.humidity    = sht.humidity;    //dht.humidity.value;
-        available = true;
+        windstation.setup();
     }
 
     void handle(){
         static Listener listener(5000);
+        windstation.handle();
+        sht.handle();
+        //dht.handle();
 
         if(!listener.ready() || device.master)
             return;
-           
-        update();
+
+        dataset.info.temperature = sht.temperature.value; 
+        dataset.info.humidity    = sht.humidity.value;  
+        dataset.info.velocity    = windstation.velocity.value;
+        dataset.info.direction   = windstation.direction.value; 
+        available = true;
     }
 };
 
