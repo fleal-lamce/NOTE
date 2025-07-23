@@ -16,7 +16,10 @@ function App() {
       .get("http://127.0.0.1:5000/images", {
         params: { band: selectedBand, region }
       })
-      .then(res => setImages(res.data));
+      .then(res => {
+        console.log("🔎 Imagens recebidas:", res.data);
+        setImages(res.data);
+      });
   }, [selectedBand, region]);
 
   return (
@@ -29,7 +32,10 @@ function App() {
           <ul>
             {bands.map((b) => (
               <li key={b}>
-                <button onClick={() => setSelectedBand(b)} style={{ fontWeight: b === selectedBand ? "bold" : "normal" }}>
+                <button
+                  onClick={() => setSelectedBand(b)}
+                  style={{ fontWeight: b === selectedBand ? "bold" : "normal" }}
+                >
                   {b}
                 </button>
               </li>
@@ -44,11 +50,14 @@ function App() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          {images.map((img, i) => (
-            <a key={i} href={`http://127.0.0.1:5000${img}`} target="_blank" rel="noreferrer">
-              <img src={`http://127.0.0.1:5000${img}`} alt={`frame ${i}`} width="200" />
-            </a>
-          ))}
+          {images.map((img, i) => {
+            const url = `http://127.0.0.1:5000${img.replace("/static", "/goes-image")}`;
+            return (
+              <a key={i} href={url} target="_blank" rel="noreferrer">
+                <img src={url} alt={`frame ${i}`} width="200" />
+              </a>
+          );
+})}
         </div>
       </div>
     </div>
