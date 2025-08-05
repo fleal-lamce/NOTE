@@ -25,7 +25,7 @@
 
 
 class EspLora{
-    public:
+  public:
     bool working = false;
     int  rssi = 0;
 

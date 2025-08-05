@@ -5,7 +5,7 @@
 
 
 class Notes{
-    public:
+  public:
     const char* path;
 
     Notes(const char* PATH_NAME){

@@ -31,14 +31,17 @@ class API:
         params = []
 
         if limit:
-            sql += "LIMIT %s"
-            params.append(limit)
+            sql += ("LIMIT %s" if limit > 0 else 'ORDER BY id DESC LIMIT %s')
+            params.append(abs(limit))
 
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             cols = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
-        
+
+        if limit and limit < 0: 
+            rows = rows[::-1] 
+    
         return orjson.dumps({'status': 'success', 'data': [dict(zip(cols, row)) for row in rows]})
 
     def add(self, table, data):

@@ -9,9 +9,10 @@
 #include "SHT30/index.h"
 #include "WIND/index.h"
 
+
 class Sensors{
-    public:
-    WindStation windstation = WindStation(41, 42);
+  public:
+    WindStation windstation = WindStation(7, 42);
     DHTSensor dht = DHTSensor(36);
     SHT30 sht = SHT30(45, 46);
     bool available;
@@ -19,21 +20,21 @@ class Sensors{
     void setup(){
         dataset.setID(device.id.get());
         //dht.setup();
-        sht.setup();
-        windstation.setup();
+        //sht.setup();
+        //windstation.setup();
     }
 
     void handle(){
         static Listener listener(5000);
-        windstation.handle();
-        sht.handle();
+        //windstation.handle();
+        //sht.handle();
         //dht.handle();
 
         if(!listener.ready() || device.master)
             return;
 
-        dataset.info.temperature = sht.temperature.value; 
-        dataset.info.humidity    = sht.humidity.value;  
+        dataset.info.temperature = dht.temperature.value; 
+        dataset.info.humidity    = dht.humidity.value;  
         dataset.info.velocity    = windstation.velocity.value;
         dataset.info.direction   = windstation.direction.value; 
         available = true;

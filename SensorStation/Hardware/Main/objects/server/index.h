@@ -4,24 +4,23 @@
 #include <HTTPClient.h>
 #include <esp_wifi.h>
 #include "../../globals/constants.h"
-#include "../../globals/variables.h"
 #include "../../globals/functions.h"
-#include "../device/index.h"
 #include "../../utils/text/index.h"
 #include "../../utils/listener/index.h"
+#include "../device/index.h"
 
 
 class EspServer{
-    public:
-    bool available  = false;
-    bool active     = false;
-    const char* URL = "http://192.168.0.10:8000/api/";
-    WiFiServer server{80};
-    WiFiClient client;
+  public:
+    bool available = false;
+    bool active    = false;
+    WiFiServer server = WiFiServer(80);
+    WiFiClient client = WiFiClient();
+    Text<64>  URL;
     Text<512> request;
 
     void handle(){
-        static Listener listener(50);
+        static Listener listener = Listener(50);
 
         if(!listener.ready() || !device.master)
             return;
@@ -40,15 +39,15 @@ class EspServer{
     }
 
     void check(){
-        static Listener listener(30000);
+        static Listener listener = Listener(30000);
         
         if(!listener.ready() || !device.master)
             return;
         
-        Text<32> response;
-        response.concat(get("check/")); 
+        Text<64> response = get("check/");
+        //Serial.println(response.toString());
 
-        active = response.contains("OK");
+        active = response.contains("success");
         Serial.println("server status: " + String(active));
     }
 
@@ -78,7 +77,7 @@ class EspServer{
             return "-1";
 
         HTTPClient http;
-        http.begin(String(URL) + route);
+        http.begin(URL.toString() + route);
         http.addHeader("Content-Type", "application/json");
         http.setTimeout(5000);
 
@@ -96,7 +95,7 @@ class EspServer{
             return "-1";
         
         HTTPClient http;
-        http.begin(String(URL) + route);
+        http.begin(URL.toString() + route);
         http.setTimeout(5000);
 
         int code = http.GET();
@@ -106,10 +105,16 @@ class EspServer{
         return payload;
     }
 
-    void connect(const char* ssid, const char* pass){
-        unsigned long startTime = device.time();
-        WiFi.mode(WIFI_STA);
+    void connect(){
+        const char* ssid = device.settings.params.get<const char*>("ssid");
+        const char* pass = device.settings.params.get<const char*>("pass");
 
+        URL = device.settings.params.get<const char*>("server");
+        //Serial.println("server URL: " + URL.toString());
+        
+        const unsigned long startTime = device.time();
+        WiFi.mode(WIFI_STA);
+        
         esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
         esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
         esp_wifi_set_ps(WIFI_PS_NONE);

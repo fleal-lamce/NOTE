@@ -13,7 +13,7 @@ void onEspReceive(const uint8_t *mac, const uint8_t *incomingData, int len);
 
 
 class EspNow {
-    public:
+  public:
     uint8_t target_address[6];
     bool available = false;
     DeviceData receivedData;

@@ -11,9 +11,9 @@
 // vermelho -> pino digital com input pullup (pulsos)
 
 class WindStation{
-    private:
+  private:
     class Velocity{
-        public:
+      public:
         const int pin;
         float value;
         char status[16];
@@ -45,6 +45,7 @@ class WindStation{
                 value   = counter/t;
                 counter = 0;
                 setStatus();
+                Serial.println(status);
             }
         }
             
@@ -79,7 +80,7 @@ class WindStation{
     };
 
     class Direction{
-        public:
+      public:
         const int pin;
         float value;
         int digital;
@@ -122,7 +123,7 @@ class WindStation{
         }
     };
 
-    public:
+  public:
     Velocity velocity;
     Direction direction;
 

@@ -14,7 +14,7 @@ struct __attribute__((packed)) DeviceData{
 };
 
 class Dataset{
-    public:
+  public:
     DeviceData info;
 
     void setID(const char* text){

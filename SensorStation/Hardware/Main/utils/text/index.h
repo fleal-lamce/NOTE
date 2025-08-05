@@ -5,23 +5,39 @@
 
 
 template<int SIZE> class Text{
-    public:
-    const int limit = (SIZE - 1);
+  public:
+    static const int limit = (SIZE - 1);
     char buffer[SIZE];
     int index;
+    
+    Text(void)
+        {reset();}
 
-    Text(){
-        reset();
-    }
+    Text(char letter)
+        {reset(); append(letter);}
+
+    Text(const char* str) 
+        {reset(); concat(str);}
+
+    Text(const String& str) 
+        {reset(); concat(str);}
+
+    Text& operator+=(char c)
+        {append(c); return *this;}
+
+    Text& operator+=(const char* str)
+        {concat(str); return *this;}
+
+    Text& operator+=(const String& str)
+        {concat(str); return *this;}
 
     void reset(){
         index = 0;
         buffer[0] = '\0';
     }
 
-    const char* get(){
-        const char* aux = buffer;
-        return aux;
+    const char* get() const {
+        return buffer;
     }
 
     bool available() const {
@@ -33,7 +49,7 @@ template<int SIZE> class Text{
             return;
 
         buffer[index++] = c;
-        buffer[index] = '\0';
+        buffer[index]   = '\0';
     }
 
     void concat(const char* str) {
@@ -46,6 +62,10 @@ template<int SIZE> class Text{
             append(str.charAt(i));
     }
 
+    void concat(char letter){
+        append(letter);
+    }
+    
     void print(bool breakLine=true) const {
         breakLine ? Serial.println(buffer) : Serial.print(buffer);
     }
@@ -76,8 +96,24 @@ template<int SIZE> class Text{
         return p ? int(p - buffer) : -1;
     }
 
-    bool blank(char c) const {
+    int find(char key) const {
+        for(int x=0; x<index; x++)
+            if(buffer[x] == key)
+                return x;
+
+        return -1;
+    }
+
+    bool isBlank(char c) const {
         return (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+    }
+
+    bool isEmpty() const {
+        for(int x=0; x<index; x++)
+            if(!isBlank(buffer[x]))
+                return false;
+
+        return true;
     }
 
     Text<SIZE> substring(int start, int end) const {
@@ -91,13 +127,13 @@ template<int SIZE> class Text{
         return out;
     }
 
-    void strip() {
+    void strip(){
         int start = 0;
-        while (start < index && blank(buffer[start]))
+        while (start < index && isBlank(buffer[start]))
             start++;
         
         int end = index - 1;
-        while (end >= start && blank(buffer[end]))
+        while(end >= start && isBlank(buffer[end]))
             end--;
         
         int newLen = end - start + 1;
@@ -136,6 +172,21 @@ template<int SIZE> class Text{
         memcpy(buffer, temp, tIdx + 1);
         index = tIdx;
     }
+
+    void remove(char target){
+        int write_index = 0;
+
+        for(int read_index=0; read_index<index; read_index++){
+            if(buffer[read_index] == target)
+                continue;
+
+            buffer[write_index++] = buffer[read_index];
+        }
+        
+        index = write_index;
+        buffer[index] = '\0';
+    }
+
 };
 
 #endif 

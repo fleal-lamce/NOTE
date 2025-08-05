@@ -2,15 +2,14 @@
 #define DEVICE_H
 #include <Arduino.h>
 #include "../../globals/constants.h"
-#include "../../globals/variables.h"
 #include "../../globals/functions.h"
 #include "../../utils/text/index.h"
 #include "settings.h"
 
 
 class Device{
-    public:
-    const bool master = false;
+  public:
+    const bool master = true;
     Settings settings;
     Text<12> id;
     unsigned long startTime;

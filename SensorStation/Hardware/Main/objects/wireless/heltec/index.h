@@ -14,7 +14,7 @@
 
 
 class HeltecLora{
-    public:
+  public:
     volatile bool available = false;
     static RadioEvents_t radioEvents;
     static HeltecLora*  instance;

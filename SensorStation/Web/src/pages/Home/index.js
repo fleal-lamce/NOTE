@@ -20,7 +20,7 @@ export default function HomePage(){
     usePeriodicCheck(handleServer, 2500)
 
     async function importData(){
-        const response = await server.post('rows', {'table': 'logs', 'limit': 30})
+        const response = await server.post('rows', {'table': 'logs', 'limit': -30})
         
         if(!response || response.status != 'success')
             return

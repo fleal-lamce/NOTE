@@ -3,13 +3,13 @@
 #include "../../globals/dataset/index.h"
 #include "../device/index.h"
 #include "../../utils/notes/index.h"
-#include "../telemetry/heltec/index.h"
+#include "../wireless/heltec/index.h"
 #include "../sensors/index.h"
 #include "../server/index.h"
 
 
 class Logs{
-    public:
+  public:
     Notes notes = Notes("/txt");
 
     void setup(){

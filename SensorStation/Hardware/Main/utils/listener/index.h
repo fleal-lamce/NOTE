@@ -4,7 +4,7 @@
 
 
 class Listener{
-    public:
+  public:
     unsigned long startTime;
     int timeout = 1000;
 
@@ -31,6 +31,10 @@ class Listener{
 
     void set(int _timeout){
         timeout = _timeout;
+    }
+
+    int passed(const unsigned long t0){
+        return (time() - t0);
     }
 
     void reset(){

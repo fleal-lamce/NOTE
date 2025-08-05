@@ -2,18 +2,18 @@
 #define dhtsensor_H
 #include <Arduino.h>
 #include <DHT.h>
-#include "../../../globals/variables.h"
 #include "../../device/index.h"
 #include "../../../utils/listener/index.h"
+
 
 #define SAMPLE_TIME 200
 #define USE_SAMPLE  true
 
 
 class DHTSensor{  
-    private:
+  private:
     class Temperature{
-        public:
+      public:
         float value; 
         bool working;
         DHT& dht;
@@ -29,10 +29,7 @@ class DHTSensor{
         float get(){
             float current = dht.readTemperature();
 
-            if (vars.temp_debug)
-                current = 25.0;
-
-            if (isnan(current) || abs(current) > 100)
+            if(isnan(current) || abs(current) > 100)
                 return 999;
 
             return current;
@@ -41,7 +38,7 @@ class DHTSensor{
         float sample(const int timeout){
             const unsigned long startTime = device.time();
 
-            while (device.time() - startTime < timeout) {
+            while(device.time() - startTime < timeout){
                 const float current = get();
 
                 if (current == 999)
@@ -59,7 +56,7 @@ class DHTSensor{
     };
 
     class Humidity{
-        public:
+      public:
         float value;
         bool working;
         DHT& dht;
@@ -101,7 +98,7 @@ class DHTSensor{
         }
     };
 
-    public:
+  public:
     DHT dht;
     Temperature temperature = Temperature(dht);
     Humidity humidity = Humidity(dht);

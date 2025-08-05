@@ -8,9 +8,9 @@
 
 
 class SHT30{
-    private:
+  private:
     class Temperature{
-        public:
+      public:
         float value;
         bool working;
 
@@ -24,7 +24,7 @@ class SHT30{
     };
 
     class Humidity{
-        public:
+      public:
         float value;
         bool working;
 
@@ -37,7 +37,7 @@ class SHT30{
         }
     };
 
-    public:
+  public:
     Temperature temperature = Temperature();
     Humidity humidity = Humidity();
     int sda, scl;

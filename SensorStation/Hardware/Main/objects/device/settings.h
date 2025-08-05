@@ -4,7 +4,7 @@
 
 
 class Settings{
-    public:
+  public:
     Json<512> params;
 
     void import(){
@@ -16,16 +16,24 @@ class Settings{
             return params.print();
         }
         
-        Serial.println("Standard Settings Imported");
-        params.parse(standard());
+        erase();
+    }
+
+    void save(){
         params.save("settings");
     }
 
+    void erase(){
+        Serial.println("Standard Settings Imported");
+        params.parse(standard());
+        save();
+    }
+    
     const char* standard(){
         return R"({
-            "active": true,
-            "ssid": "ABCDEF",
-            "pass": "EFGHI",
+            "ssid": "Klauss",
+            "pass": "12345678",
+            "server": "http://192.168.249.12:8000/api/";
             "channel": 5
         })";
     }

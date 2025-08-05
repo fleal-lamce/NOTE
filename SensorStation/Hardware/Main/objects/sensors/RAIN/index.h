@@ -8,7 +8,7 @@
 
 
 class RainStation{
-    public:
+  public:
     int pin;
     int counter;
     float value;

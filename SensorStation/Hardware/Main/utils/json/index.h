@@ -5,7 +5,7 @@
 
 
 template<int SIZE> class Json{
-    public:
+  public:
     StaticJsonDocument<SIZE> data;
 
     void print() const{
