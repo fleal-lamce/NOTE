@@ -3,10 +3,12 @@ from flask_cors import CORS
 from pathlib import Path
 import os
 from datetime import datetime, timedelta
+from flask import send_file
 
 BASE_DIR = Path("E:/GOES-Organized")
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
+
 CORS(app, origins=["http://localhost:5173"])
 
 @app.route("/bands", methods=["GET"])
@@ -46,9 +48,14 @@ def get_images():
 
 @app.route("/static/<path:filename>")
 def serve_static(filename):
-    # serve a imagem a partir do diretório BASE_DIR
     full_path = BASE_DIR / filename
-    return send_from_directory(full_path.parent, full_path.name)
+    print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
+    print(f"[DEBUG] filename: {filename}")
+    print(f"[DEBUG] Caminho final: {full_path}")
+    if not full_path.exists():
+        print(f"[ERRO] Arquivo não encontrado: {full_path}")
+        return f"Arquivo não encontrado: {full_path}", 404
+    return send_file(full_path)
 
 app.config["JSON_SORT_KEYS"] = False
 app.config["JSON_AS_ASCII"] = False
