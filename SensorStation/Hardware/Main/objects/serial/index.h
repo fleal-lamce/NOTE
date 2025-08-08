@@ -13,9 +13,9 @@ template<int CMD_SIZE> class NextSerial{
   public:
     Text<CMD_SIZE> command;
     bool available = false;
-    int timeout    = 5000; 
+    int timeout    = 5000;
     Stream& uart;
-
+    
     NextSerial(Stream& ser):
         uart(ser){}
 
@@ -35,17 +35,42 @@ template<int CMD_SIZE> class NextSerial{
             reset();
         
         const unsigned long startTime = device.time();
-        while(uart.available() && device.time() - startTime < 5000){
+        while(uart.available() && device.time() - startTime < timeout){
             const char letter = (char) uart.read();
             
             if(junk)
                 continue;
 
             command.concat(letter);
-            delay(1);
+            delay(2);
         }
         
         available = (command.length() > 5 && !command.isEmpty());
+    }
+
+    void send(const char* msg, bool breakLine=true){
+        Serial.println("(sending) " + String(msg));
+        uart.write(msg);
+
+        if(breakLine)
+            uart.write("\r\n");
+    }
+
+    void print(){
+        if(!available){
+            Serial.println("nothing received");
+            return;
+        }
+
+        Serial.println("(received) " + command.toString());
+        reset();
+    }
+
+    void await(const int ms){
+        const unsigned long startTime = device.time();
+
+        while(device.time() - startTime < ms)
+            listen();
     }
     
     void reset(){

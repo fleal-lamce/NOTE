@@ -78,6 +78,18 @@ template<int SIZE> class Text{
         return (find(key) != -1);
     }
 
+    bool equals(const char* str) const {
+        int len = 0;
+        while (str[len] != '\0')
+            len++;
+
+        for(int x=0; x<index; x++)
+            if(x >= len || buffer[x] != str[x]) 
+                return false;
+    
+        return (len == index);
+    }
+
     void set(int pos, char value) {
         if(pos >= 0 && pos < limit)
             buffer[pos] = value;
