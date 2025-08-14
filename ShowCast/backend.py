@@ -1,14 +1,13 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 from pathlib import Path
+from collections import defaultdict
 import os
-from datetime import datetime, timedelta
-from flask import send_file
+from datetime import datetime, timedelta, timezone
 
 BASE_DIR = Path("E:/GOES-Organized")
 
 app = Flask(__name__, static_folder=None)
-
 CORS(app, origins=["http://localhost:5173"])
 
 @app.route("/bands", methods=["GET"])
@@ -19,32 +18,42 @@ def get_bands():
 
 @app.route("/images")
 def get_images():
-    band = request.args.get("band")
     region = request.args.get("region", "Brasil")
-    # número de horas para “lookback”; usa 24 por padrão
     hours = int(request.args.get("hours", "24"))
-    if not band:
-        return jsonify({"error": "Parâmetro 'band' é obrigatório"}), 400
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
-    band_dir = BASE_DIR / band
-    if not band_dir.exists():
-        return jsonify({"error": f"Banda '{band}' não encontrada"}), 404
+    # {timestamp: {band: path}}
+    frames_map = defaultdict(dict)
 
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
-    images = []
-    # percorre recursivamente as pastas <ano>/<mes>/<dia>/<region>
-    for root, _, files in os.walk(band_dir):
-        if root.endswith(region):
-            for f in files:
-                if f.lower().endswith(".jpg"):
-                    full = Path(root) / f
-                    # verifica a data de modificação do arquivo
-                    if datetime.fromtimestamp(full.stat().st_mtime) >= cutoff:
-                        rel = full.relative_to(BASE_DIR)
-                        images.append(f"/static/{rel.as_posix()}")
-    # classifica pelo nome (ou timestamp extraído do nome, se houver)
-    images.sort()
-    return jsonify(images)
+    bands = [f.name for f in BASE_DIR.iterdir() if f.is_dir()]
+    for band in bands:
+        band_dir = BASE_DIR / band
+        if not band_dir.exists():
+            continue
+
+        for root, _, files in os.walk(band_dir):
+            if root.endswith(region):
+                for f in files:
+                    if f.lower().endswith(".jpg"):
+                        full = Path(root) / f
+                        if datetime.fromtimestamp(full.stat().st_mtime, timezone.utc) >= cutoff:
+                            # Extrai timestamp no formato "YYYY-MM-DD_HH-MM"
+                            name_parts = f.split("_")
+                            if len(name_parts) >= 2:
+                                timestamp = f"{name_parts[0]}_{name_parts[1]}"
+                                rel = full.relative_to(BASE_DIR)
+                                frames_map[timestamp][band] = f"/static/{rel.as_posix()}"
+
+    # Filtra apenas os timestamps que têm imagens em pelo menos 12 bandas (ajuste conforme desejar)
+    result = []
+    for ts in sorted(frames_map):
+        if len(frames_map[ts]) >= 12:
+            result.append({
+                "timestamp": ts,
+                "images": frames_map[ts]
+            })
+
+    return jsonify(result)
 
 @app.route("/static/<path:filename>")
 def serve_static(filename):
