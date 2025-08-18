@@ -45,7 +45,7 @@ class EspServer{
             return;
         
         Text<64> response = get("check/");
-        //Serial.println(response.toString());
+        Serial.println(response.toString());
 
         active = response.contains("success");
         Serial.println("server status: " + String(active));

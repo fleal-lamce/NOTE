@@ -7,14 +7,25 @@ class Status:
         self.df   = pd.DataFrame()
         self.data = {}
 
+    def getLast(self, key, number=False):
+        s = self.df.get(key)
+        if s is None:
+            return None
+        
+        s = s.dropna()
+        if number:
+            return float(s.iloc[-1]) if not s.empty else None
+
+        return s.iloc[-1] if not s.empty else None
+
     def update(self, df):
         self.df = df.copy()
         last    = self.df.iloc[-1]
 
-        t = float(last.get('temperature')) if pd.notna(last.get('temperature')) else None
-        h = float(last.get('humidity'))    if pd.notna(last.get('humidity'))    else None
-        p = float(last.get('pressure'))    if pd.notna(last.get('pressure'))    else None
-        w = float(last.get('wind'))        if pd.notna(last.get('wind'))        else None
+        t = self.getLast('temperature', number=True)
+        h = self.getLast('humidity', number=True)
+        p = self.getLast('pressure', number=True)
+        w = self.getLast('humidity', number=True)
 
         gust  = round(w + 1.6, 1) if w is not None else None
         feels = round(t + ((h-50)/50)*1.2 - (w*0.3), 1) if None not in (t,h,w) else None
@@ -25,19 +36,9 @@ class Status:
             p_prev = df.iloc[-2].get('pressure')
             trend = '↑' if (pd.notna(p_prev) and p >= float(p_prev)) else '↓'
 
-        self.data = {
-            'temp': t, 
-            'feels': feels, 
-            'hum': h, 
-            'dew': dp, 
-            'press': p, 
-            'trend': trend, 
-            'wind': w, 
-            'gust': gust
-        }
-
+        self.data = {'temp': t, 'feels': feels, 'hum': h, 'dew': dp, 'press': p, 'trend': trend, 'wind': w, 'gust': gust}
         self.info = {
-            'last_update':     f"Atualizado: {datetime.now().strftime('%H:%M')}",
+            'last_update':     f"Atualizado: {self.getLast('time').strftime("%d/%m/%Y %H:%M:%S")}",
             'kpi_temp':        f"{self.data['temp']}°C" if self.data['temp'] is not None else "--°C",
             'kpi_temp_badge':  f"Sensação: {self.data['feels']}°C" if self.data['feels'] is not None else "Sensação: —",
             'kpi_hum':         f"{self.data['hum']}%" if self.data['hum'] is not None else "--%",

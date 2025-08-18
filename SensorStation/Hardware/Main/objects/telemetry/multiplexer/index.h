@@ -6,8 +6,8 @@
 #include "../../../utils/listener/index.h"
 #include "../../serial/index.h"
 
-#define RX_PIN 16
-#define TX_PIN 17
+#define RX_PIN 19
+#define TX_PIN 20
 
 
 class Multiplexer{

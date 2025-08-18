@@ -4,8 +4,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-ffzvrkk7#pq+bqs-mg@%dyu&izjfc%cn4sg6eqz*l-@3nmt-tv'
 DEBUG = True
 
-CORS_ALLOW_ALL_ORIGINS = True
-ALLOWED_HOSTS  = ['*']
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -69,6 +67,9 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+ALLOWED_HOSTS  = ['*']
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'America/Sao_Paulo'

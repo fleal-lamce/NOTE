@@ -6,13 +6,14 @@ import plotly.graph_objects as go
 
 class LineGraph:
     def __init__(self):
-        self.df = pd.DataFrame()
-        self.title = 'Gráfico Bom so'
+        self.df    = pd.DataFrame()
+        self.title = 'Gráfico Temporal'
 
     def update(self, dataframe):
-        self.df = dataframe.copy().tail(24)
+        self.df = dataframe.copy().tail(50)
 
     def render(self, variable='temperature'):
+        self.title = f'Gráfico Temporal - {variable}'
         data  = UNITS[variable]
         unit  = data.get('unit')
         color = data.get('color')

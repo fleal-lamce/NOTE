@@ -19,7 +19,6 @@ class Tasks{
         server.handle();
         server.check();
         routes.handle();
-        multiplexer.handle();
     }
 
     void slave(){
