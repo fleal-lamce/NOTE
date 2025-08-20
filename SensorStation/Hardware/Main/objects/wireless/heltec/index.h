@@ -23,7 +23,7 @@ class HeltecLora{
 
     void setup() {
         instance = this;
-        //Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+        Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
         radioEvents.RxDone     = onReceive;
         radioEvents.TxDone     = onTxComplete;
         radioEvents.TxTimeout  = onTxFailed;
