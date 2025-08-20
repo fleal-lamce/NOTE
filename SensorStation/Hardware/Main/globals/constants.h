@@ -1,5 +1,9 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-const float PI_VAR = 3.14159;
+
+#define MASTER_MODE 0
+#define SLAVE_MODE  1
+#define MISTER_MODE 2
+
 #endif

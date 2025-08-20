@@ -38,7 +38,6 @@ class RainStation{
 
             value   = counter/t;
             counter = 0;
-            setStatus();
         }
     }
 };

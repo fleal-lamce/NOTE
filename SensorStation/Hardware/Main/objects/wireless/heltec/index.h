@@ -12,7 +12,6 @@
 #define LORA_PREAMBLE_LENGTH  8
 #define TX_TIMEOUT_MS 2000 // tempo máximo para esperar TxDone
 
-
 class HeltecLora{
   public:
     volatile bool available = false;
@@ -24,7 +23,7 @@ class HeltecLora{
 
     void setup() {
         instance = this;
-        Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+        //Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
         radioEvents.RxDone     = onReceive;
         radioEvents.TxDone     = onTxComplete;
         radioEvents.TxTimeout  = onTxFailed;

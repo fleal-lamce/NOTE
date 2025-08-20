@@ -3,7 +3,7 @@
 #include "../../globals/dataset/index.h"
 #include "../device/index.h"
 #include "../../utils/notes/index.h"
-#include "../wireless/heltec/index.h"
+//#include "../wireless/heltec/index.h"
 #include "../sensors/index.h"
 #include "../server/index.h"
 
@@ -19,11 +19,14 @@ class Logs{
     }
 
     void handle(){
-        if(!device.master)
-            return handleSender();
-
-        handleStore();
-        handleServer();
+        if(device.mode == SLAVE_MODE || device.mode == MISTER_MODE){
+            handleSender();
+        }
+        
+        if(device.mode == MASTER_MODE || device.mode == MISTER_MODE){
+            handleStore();
+            handleServer();
+        }
     }
 
     void handleSender(){
@@ -35,19 +38,19 @@ class Logs{
         if(!sensors.available)
             return;
         
-        heltec.send(dataset.info); 
+        //heltec.send(dataset.info); 
         sensors.available = false;
         Serial.println("(log) sent: " + dataset.toString());
     }
 
     void handleStore(){
-        static Listener listener = Listener(5000);
+        static Listener listener = Listener(7000);
         
         if(!listener.ready())
             return;
 
-        if(!heltec.get(dataset.info))
-            return;
+        //if(!heltec.get(dataset.info))
+        //    return;
         
         store();
     }

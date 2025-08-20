@@ -1,7 +1,6 @@
 #ifndef FUNCTIONS_H
 #define FUNCTIONS_H
 
-
 const char* concatenate(const char* s1, const char* s2){
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);

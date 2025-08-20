@@ -6,31 +6,35 @@
 #include "objects/server/routes.h"
 #include "objects/logs/index.h"
 #include "objects/sensors/index.h"
-#include "objects/wireless/heltec/index.h"
 #include "objects/telemetry/protocol/index.h"
 #include "objects/telemetry/multiplexer/index.h"
-
+//#include "objects/wireless/heltec/index.h"
 
 void setup(){
     Serial.begin(115200);
     delay(800);
-    
-    device.setup();
-    heltec.setup();
 
-    if(device.master){
+    device.setup();
+
+    //if(device.mode != MISTER_MODE)
+        //heltec.setup();
+
+    if(device.mode == MASTER_MODE || device.mode == MISTER_MODE){
         logs.setup();
         server.connect();
     }
     
-    if(!device.master){
-        multiplexer.setup();
+    if(device.mode == SLAVE_MODE || device.mode == MISTER_MODE){
         sensors.setup();
+    }
+
+    if(device.mode == SLAVE_MODE){
         multiplexer.setup();
     }
+
+    Serial.println("setup finished");
 }
 
 void loop(){
-    device.master ? tasks.master() : tasks.slave();
-    tasks.standard();
+    tasks.handle();
 }

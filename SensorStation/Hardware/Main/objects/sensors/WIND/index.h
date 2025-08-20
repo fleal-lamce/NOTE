@@ -8,7 +8,7 @@
 // preto   -> GND
 // Desencapado -> GND
 // verde -> analogico
-// vermelho -> pino digital com input pullup (pulsos)
+// vermelho -> pino digital com input pullup (pulsos) (velocity)
 
 class WindStation{
   private:
@@ -42,7 +42,7 @@ class WindStation{
                 const float t = listener.getSec();
                 listener.reset();
 
-                value   = counter/t;
+                value   = counter/t * 1000;
                 counter = 0;
                 setStatus();
                 Serial.println(status);

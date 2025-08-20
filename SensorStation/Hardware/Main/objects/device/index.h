@@ -9,7 +9,7 @@
 
 class Device{
   public:
-    const bool master = true;
+    const byte mode = MISTER_MODE;
     Settings settings;
     Text<12> id;
     unsigned long startTime;
@@ -21,7 +21,17 @@ class Device{
 
     void setup(){
         sleep(1000);
-        Serial.println("Device Started: " + String(master ? "master " : "slave ") + getID());
+        Serial.println("Device Started: " + getID());
+        
+        if(mode == MASTER_MODE)
+            Serial.println("Modo Master Ativo");
+        
+        if(mode == SLAVE_MODE)
+            Serial.println("Modo Slave Ativo");
+
+        if(mode == MISTER_MODE)
+            Serial.println("Modo Misto Ativo");
+
         settings.import();
     }
 

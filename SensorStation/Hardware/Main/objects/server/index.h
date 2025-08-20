@@ -22,7 +22,7 @@ class EspServer{
     void handle(){
         static Listener listener = Listener(50);
 
-        if(!listener.ready() || !device.master)
+        if(!listener.ready() || device.mode == SLAVE_MODE)
             return;
         
         client = server.available();
@@ -41,7 +41,7 @@ class EspServer{
     void check(){
         static Listener listener = Listener(30000);
         
-        if(!listener.ready() || !device.master)
+        if(!listener.ready() || device.mode == SLAVE_MODE)
             return;
         
         Text<64> response = get("check/");
