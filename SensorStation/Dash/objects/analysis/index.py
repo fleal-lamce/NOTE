@@ -39,15 +39,15 @@ class Analysis:
         if self.device != 'all':
             self.df = self.df.loc[self.df.esp_id == self.device]
 
-        if len(self.df) > 50:
-            self.df = self.df.tail(50)
-        
         self.curr_time = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
         self.timestamp = self.getLastVar('time').strftime('%d/%m/%Y %H:%M:%S') if self.getLastVar('time') else 'N/A'
         self.temperature = self.getLastVar('temperature', number=True)
         self.humidity = self.getLastVar('humidity', number=True)
         self.pressure = self.getLastVar('pressure', number=True)
         self.wind = self.getLastVar('wind', number=True)
+
+        if len(self.df) > 150:
+            self.df = self.df.tail(150)
 
 
     def getLastVar(self, key, number=False):
