@@ -6,7 +6,7 @@ import plotly.express as px
 from globals.variables import *
 from globals.functions import *
 from interface.index import interface
-from assets.index import page
+from assets.index import drawPage
 from graphs.line import LineGraph
 from graphs.table import Table
 from graphs.status import Status
@@ -18,14 +18,14 @@ class Dashboard:
     time = getTime()
 
     def __init__(self):
-        self.app  = dash.Dash(__name__, assets_folder='assets', title='Sensor Station Dashboard - COPPE/UFRJ')
+        self.app = dash.Dash(__name__, assets_folder='assets', title='Sensor Station Dashboard - COPPE/UFRJ')
         self.download()
         self.setup()
         
         self.line = LineGraph()
         self.line.update(self.df)
 
-        self.table = Table()
+        self.table  = Table()
         self.table.update(self.df, 'temperature')
 
         self.status = Status()
@@ -47,9 +47,15 @@ class Dashboard:
         self.df = pd.concat([
             self.df.time,
             self.df.esp_id,
+            self.df.area,
             pd.json_normalize(self.df.data)
         ], axis=1)
 
+        self.devices = [{'label': id, 'value': id} for id in self.df.esp_id.unique()]     + [{'label': 'todos', 'value': 'all'}]
+        self.areas   = [{'label': area, 'value': area} for area in self.df.area.unique()] + [{'label': 'todos', 'value': 'all'}]
+
+    def clicked(self, key):
+        return callback_context.triggered and callback_context.triggered[0]["prop_id"].startswith(key)
 
     def setup(self):
         outputs = [
@@ -72,21 +78,32 @@ class Dashboard:
         inputs = [
             Input("refresh-btn", "n_clicks"),
             Input("var-select", "value"),
+            Input("area-select", "value"),
+            Input("device-select", "value"),
         ]
 
         @self.app.callback(outputs, inputs)
-        def render(n_clicks, varkey):
-            if callback_context.triggered and callback_context.triggered[0]["prop_id"].startswith("refresh-btn"):
+        def render(n_clicks, varkey, area, device):
+            if self.clicked("refresh-btn"):
                 print('clicou')
                 self.download()
 
             varkey = varkey or "temperature"
+            
+            print(device)
+            
+            if device and device != 'all':
+                target = [device]
+            else:
+                target = list(self.df.esp_id.dropna().unique())
+            
+            df = self.df.loc[self.df.esp_id.isin(target)]
 
-            self.line.update(self.df)
+            self.line.update(df)
             fig, y_min, y_max = self.line.render(varkey)
 
-            self.table.update(self.df, varkey)
-            self.status.update(self.df)
+            self.table.update(df, varkey)
+            self.status.update(df)
             
             return [
                 fig,
@@ -107,7 +124,7 @@ class Dashboard:
             ]
 
     def draw(self):
-        self.app.layout = html.Div(className="container", children=page)
+        self.app.layout = html.Div(className="container", children=drawPage(self.devices, self.areas))
 
     
 if __name__ == '__main__':

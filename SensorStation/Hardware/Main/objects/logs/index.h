@@ -3,9 +3,9 @@
 #include "../../globals/dataset/index.h"
 #include "../device/index.h"
 #include "../../utils/notes/index.h"
-//#include "../wireless/heltec/index.h"
 #include "../sensors/index.h"
 #include "../server/index.h"
+//#include "../wireless/heltec/index.h"
 
 
 class Logs{
@@ -14,12 +14,13 @@ class Logs{
 
     void setup(){
         Serial.println("Setting Up Notes");
+        //heltec.setup();
         delay(2000);
         notes.setup();
     }
 
     void handle(){
-        if(device.mode == SLAVE_MODE || device.mode == MISTER_MODE){
+        if(device.mode == SLAVE_MODE  || device.mode == MISTER_MODE){
             handleSender();
         }
         

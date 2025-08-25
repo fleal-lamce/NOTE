@@ -49,7 +49,6 @@ class Status:
             'kpi_wind_badge':  f"Rajada: {self.data['gust']} m/s" if self.data['gust'] is not None else "Rajada: —",
         }
 
-
     def dewPoint(self, tempC: float, rh: float) -> float:
         a, b = 17.27, 237.7        # Magnus-Tetens approximation (stable for rh≈0)
         rh = max(float(rh), 1e-6)  # evita log(0)

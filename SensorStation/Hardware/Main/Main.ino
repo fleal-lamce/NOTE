@@ -8,19 +8,15 @@
 #include "objects/sensors/index.h"
 #include "objects/telemetry/protocol/index.h"
 #include "objects/telemetry/multiplexer/index.h"
-//#include "objects/wireless/heltec/index.h"
+
 
 void setup(){
     Serial.begin(115200);
     delay(800);
-
     device.setup();
-
-    //if(device.mode != MISTER_MODE)
-        //heltec.setup();
+    logs.setup();
 
     if(device.mode == MASTER_MODE || device.mode == MISTER_MODE){
-        logs.setup();
         server.connect();
     }
     
