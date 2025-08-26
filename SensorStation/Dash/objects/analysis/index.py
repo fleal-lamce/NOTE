@@ -49,7 +49,6 @@ class Analysis:
         if len(self.df) > 150:
             self.df = self.df.tail(150)
 
-
     def getLastVar(self, key, number=False):
         s = self.df.get(key)
         if s is None:
@@ -57,6 +56,6 @@ class Analysis:
         
         s = s.dropna()
         if number:
-            return float(s.iloc[-1]) if not s.empty else '- '
+            return float(s.iloc[-1]) if not s.empty else -1
 
-        return s.iloc[-1] if not s.empty else '- '
+        return s.iloc[-1] if not s.empty else None
