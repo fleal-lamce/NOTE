@@ -16,7 +16,7 @@ class Analysis:
         self.area   = 'all'
 
     def download(self):
-        conn = sqlite3.connect('../server/db.sqlite3')
+        conn = sqlite3.connect('../Server/db.sqlite3')
         self.database = pd.read_sql_query('SELECT * FROM Logs_log ORDER BY id DESC LIMIT 7500', conn).sort_values(by='id')
 
         self.database['data'] = self.database.data.apply(ast.literal_eval)
