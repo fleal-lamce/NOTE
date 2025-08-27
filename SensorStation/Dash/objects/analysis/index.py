@@ -17,7 +17,7 @@ class Analysis:
 
     def download(self):
         conn = sqlite3.connect('../Server/db.sqlite3')
-        self.database = pd.read_sql_query('SELECT * FROM Logs_log ORDER BY id DESC LIMIT 7500', conn).sort_values(by='id')
+        self.database = pd.read_sql_query('SELECT * FROM (SELECT * FROM Logs_log ORDER BY id DESC LIMIT 15000) AS subquery_alias ORDER BY id ASC;', conn)
 
         self.database['data'] = self.database.data.apply(ast.literal_eval)
         self.database['time'] = pd.to_datetime(self.database.timestamp, errors='coerce')
