@@ -44,7 +44,7 @@ class EspServer{
         if(!listener.ready() || device.mode == SLAVE_MODE)
             return;
         
-        Text<64> response = get("check/");
+        Text<64> response = get("check/", 12000);
         Serial.println(response.toString());
 
         active = response.contains("success");
@@ -72,14 +72,14 @@ class EspServer{
         client.print(data);
     }
 
-    String post(const String &route, const String &data) {
+    String post(const String &route, const String &data, const int timeout=5000){
         if(!connected())
             return "-1";
 
         HTTPClient http;
         http.begin(URL.toString() + route);
         http.addHeader("Content-Type", "application/json");
-        http.setTimeout(5000);
+        http.setTimeout(timeout);
 
         int code = http.POST(data);
         int size = http.getSize();
@@ -87,16 +87,17 @@ class EspServer{
         String payload = ok ? http.getString() : "-1";
 
         http.end();
+        Serial.println("(post) size: " + String(size) + " | received: " + payload);
         return payload;
     }
 
-    String get(const String &route){
+    String get(const String &route, const int timeout=5000){
         if(!connected())
             return "-1";
         
         HTTPClient http;
         http.begin(URL.toString() + route);
-        http.setTimeout(5000);
+        http.setTimeout(timeout);
 
         int code = http.GET();
         String payload = (code > 0) ? http.getString() : "-1";
@@ -110,8 +111,6 @@ class EspServer{
         const char* pass = device.settings.params.get<const char*>("pass");
 
         URL = device.settings.params.get<const char*>("server");
-        //Serial.println("server URL: " + URL.toString());
-        
         const unsigned long startTime = device.time();
         WiFi.mode(WIFI_STA);
         

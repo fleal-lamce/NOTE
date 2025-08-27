@@ -57,13 +57,7 @@ template<int CMD_SIZE> class NextSerial{
     }
 
     void print(){
-        if(!available){
-            Serial.println("nothing received");
-            return;
-        }
-
-        Serial.println("(received) " + command.toString());
-        reset();
+        Serial.println(available ? "(received) " + command.toString() : "nothing received");
     }
 
     void await(const int ms){
