@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Aug 12 19:47:03 2025
+
+@author: clariana
+"""
+
+import os
+import csv
+import time
+import math
+from datetime import datetime
+from collections import defaultdict, deque
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+entrada_csv = "C:\\Users\\ire0052\\Documents\\teste_estacao\\monitoramento"
+# Ajuste o caminho de saída conforme necessário
+saida_csv = "C:\\Users\\ire0052\\Documents\\teste_estacao\\indice_apb.csv"
+arquivo_prefixo = "observations_AWS310_2"
+
+# Mapeamento das variáveis originais para nomes amigáveis
+variaveis_desejadas = {
+    "AIR_TEMPERATURE_DEGREES_CELSIUS_MEAN_PT1H_1": "Air Temperature",
+    "RELATIVE_HUMIDITY_PERCENT_MEAN_PT1H_1": "Relative Humidity",
+    "WIND_SPEED_METRES_PER_SECOND_MEAN_PT10M_1": "SpeedWind"
+}
+
+speedwind_medias_arquivos = deque(maxlen=6)
+
+def calculate_vapour_pressure(temperature_c, relative_humidity_percent):
+    rh_frac = relative_humidity_percent / 100.0
+    return rh_frac * 6.105 * math.exp((17.27 * temperature_c) / (237.7 + temperature_c))
+
+def calculate_apparent_temperature(temperature_c, vapour_pressure, speedwind_mps):
+    return temperature_c + (0.33 * vapour_pressure) - (0.70 * speedwind_mps) - 4.00
+
+def processar_csv(caminho_arquivo):
+    """
+    Processa o CSV para:
+    - Air Temperature e Relative Humidity: média a cada 10 linhas.
+    - SpeedWind: média a cada 10 linhas e depois acumula para média de 6 blocos.
+    Ao completar 6 blocos SpeedWind, calcula temperatura aparente e salva no CSV de saída.
+    """
+    # Buffers temporários para média de 10 linhas
+    buffers = {
+        "AIR_TEMPERATURE_DEGREES_CELSIUS_MEAN_PT1H_1": [],
+        "RELATIVE_HUMIDITY_PERCENT_MEAN_PT1H_1": [],
+        "WIND_SPEED_METRES_PER_SECOND_MEAN_PT10M_1": []
+    }
+    
+    # Listas para médias parciais de 10 linhas para cada variável
+    medias_parciais = {
+        "Air Temperature": [],
+        "Relative Humidity": [],
+        "SpeedWind": []
+    }
+    
+    with open(caminho_arquivo, mode='r', encoding='utf-8') as f:
+        leitor = csv.reader(f, delimiter=';')
+        for linha in leitor:
+            if len(linha) < 6:
+                continue
+            nome_var = linha[2].strip()
+            valor_str = linha[5].strip()
+            if nome_var in variaveis_desejadas:
+                try:
+                    valor = float(valor_str)
+                except ValueError:
+                    continue
+                
+                # Acrescenta ao buffer correspondente
+                buffers[nome_var].append(valor)
+                
+                # Se o buffer chegou a 10, calcula média e zera buffer
+                if len(buffers[nome_var]) == 10:
+                    media = sum(buffers[nome_var]) / 10
+                    medias_parciais[variaveis_desejadas[nome_var]].append(media)
+                    buffers[nome_var].clear()
+
+    # Calcula médias finais para Air Temperature e Relative Humidity (média das médias de 10 linhas)
+    air_temp_hora = None
+    if medias_parciais["Air Temperature"]:
+        air_temp_hora = round(sum(medias_parciais["Air Temperature"]) / len(medias_parciais["Air Temperature"]), 2)
+    
+    rh_hora = None
+    if medias_parciais["Relative Humidity"]:
+        rh_hora = round(sum(medias_parciais["Relative Humidity"]) / len(medias_parciais["Relative Humidity"]), 2)
+    
+    # Para SpeedWind, acumula médias de 10 linhas e guarda para média de 6 blocos
+    if medias_parciais["SpeedWind"]:
+        speedwind_media_arquivo = round(sum(medias_parciais["SpeedWind"]) / len(medias_parciais["SpeedWind"]), 2)
+        speedwind_medias_arquivos.append(speedwind_media_arquivo)
+    else:
+        speedwind_media_arquivo = None
+    
+    # Quando tiver 6 médias acumuladas de SpeedWind, calcula média horário e salva
+    if len(speedwind_medias_arquivos) == 6 and air_temp_hora is not None and rh_hora is not None:
+        speedwind_hora = round(sum(speedwind_medias_arquivos) / 6, 2)
+        vapour_pres = calculate_vapour_pressure(air_temp_hora, rh_hora)
+        app_temp = calculate_apparent_temperature(air_temp_hora, vapour_pres, speedwind_hora)
+        
+        data_str = datetime.now().date().isoformat()
+        hora_str = datetime.now().time().isoformat(timespec='seconds')
+        
+        # Cria arquivo com cabeçalho se não existir
+        if not os.path.exists(saida_csv):
+            with open(saida_csv, mode='w', newline='', encoding='utf-8') as f_out:
+                writer = csv.writer(f_out)
+                header = ['DATA', 'HORA', 'SpeedWind_mps', 'Air_Temperature_C', 'Relative_Humidity_%', 'Apparent_Temperature_C']
+                writer.writerow(header)
+
+        with open(saida_csv, mode='a', newline='', encoding='utf-8') as f_out:
+            writer = csv.writer(f_out)
+            writer.writerow([data_str, hora_str, speedwind_hora, air_temp_hora, rh_hora, round(app_temp, 2)])
+
+        print(f"Dados gravados para {data_str} {hora_str}")
+        
+        speedwind_medias_arquivos.clear()
+    else:
+        print(f"Arquivo {os.path.basename(caminho_arquivo)} processado. Ainda esperando para acumular 6 blocos de SpeedWind para cálculo horário.")
+
+class NovoArquivoHandler(FileSystemEventHandler):
+    def on_created(self, event):
+        if not event.is_directory and os.path.basename(event.src_path).startswith(arquivo_prefixo):
+            print(f"Arquivo detectado: {event.src_path}")
+            time.sleep(2)  # espera o arquivo ser completamente escrito
+            processar_csv(event.src_path)
+
+observer = Observer()
+evento_handler = NovoArquivoHandler()
+observer.schedule(evento_handler, entrada_csv, recursive=False)
+observer.start()
+print("Monitorando a chegada de arquivos... Pressione Ctrl+C para parar.")
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    observer.stop()
+observer.join()
