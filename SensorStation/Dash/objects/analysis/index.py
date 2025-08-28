@@ -22,7 +22,7 @@ class Analysis:
         df    = pd.read_sql_query(QUERY, conn)
 
         self.database = pd.concat([
-            pd.to_datetime(df.timestamp, errors='coerce'),
+            pd.to_datetime(df.timestamp, errors='coerce', utc=True).dt.tz_convert('America/Sao_Paulo').dt.tz_localize(None),
             df.esp_id,
             df.area,
             pd.json_normalize(df.data.apply(ast.literal_eval))
