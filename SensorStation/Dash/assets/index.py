@@ -7,10 +7,7 @@ class Interface:
 
     def logo(self):
         return html.Div(className="logos-container", children=[
-            html.Img(
-                src="/assets/images/grva.png",
-                className='logoimage'
-            ),
+            html.Img(src="/assets/images/grva.png", className='logoimage'),
             html.Div(children=[], style={'padding': '10px'}),
             html.Div(children=[
                 html.Div("Estação Sensorial - Lamce/GRVA", className='titletext'),
@@ -31,28 +28,38 @@ class Interface:
         ])
     
     def variable(self, label, id):
+        img_name = id.split('-')[0].strip().lower()
+
         return html.Div(className='show-variable', children=[
-            html.Div(className='logo-var'),
-            
+            html.Img(src=f"/assets/images/{img_name}.png", className='logo-var'),
+
             html.Div(className='info-var-container', children=[
                 html.Div(label, className='info-var-label'),
                 html.Div('Valor', id=id, className='info-var-value'),
                 html.Div()
-            ]),
-            html.Div('variação de ±2%', id=f'altern-{id}', className='info-var-altern')
+            ])
         ])
     
     def graph(self):
         return html.Div(className='graph-container', children=[
             html.Div(className='graph-title', children=[
-                html.Div('Gráfico Temporal - Variável', id='graph-title', className='graph-title-left'),
-                html.Div('Atualizado em dd/mm/yy - 13:12:11', id='graph-date', className='graph-title-right')
+                html.Div(style={'width': '60%', 'color': 'black', 'height': '1.5rem'}, children=[
+                    self.input('Variável:', self.dashboard.analysis.variables, 'var-select'),
+                ])
             ]),
             
             html.Div(className='line-graph', children=[
-                dcc.Graph(id="chart", config={"displayModeBar": False}, style={'width': '100%', 'height': '100%'})
+                dcc.Graph(
+                    id="chart", 
+                    config={"displayModeBar": True, "displaylogo": False}, 
+                    style={'width': '100%', 'height': '100%'}
+                )
             ]),
-            html.Div('Último Valor: 90% | Faixa: 40.0 - 89%', className='graph-bottom', id='graph-last-val')
+
+            html.Div(className='graph-title', children=[
+                html.Div('Último Valor: 90% | Faixa: 40.0 - 89%', className='graph-bottom', id='graph-last-val'),
+                html.Div('Atualizado em dd/mm/yy - 13:12:11', id='graph-date', className='graph-title-right')
+            ]),         
         ])
     
     def table(self):
@@ -75,12 +82,25 @@ class Interface:
 
             html.Div(className='table-header')
         ])
+    
+    def map(self):
+        return html.Div(className='table-container', children=[
+            dcc.Graph(
+                id='rjmap',
+                figure=self.dashboard.map.fig,
+                config={"displayModeBar": True},
+                style={"height": "70vh", "minHeight": 400}
+            ),
+            dcc.Store(
+                id=f"rjmap-points", 
+                data=self.dashboard.map.df.to_dict("records")
+            ),
+        ], style={'width': '29%'})
 
     def render(self):
         return html.Header(className='App', children=[
             html.Div(className='first-row', children=[
                 self.logo(),
-                self.input('Variável:',  self.dashboard.analysis.variables, 'var-select'),
                 self.input('Área Alvo:', self.dashboard.analysis.areas, 'area-select'),
                 self.input('ID Device:', self.dashboard.analysis.devices, 'device-select'),
                 html.Button("Atualizar", id="update-button", n_clicks=0, title="Recarregar do CSV", className='update-button'),
@@ -91,10 +111,14 @@ class Interface:
                 self.variable('Umidade', 'humidity-var'),
                 self.variable('Pressão', 'pressure-var'),
                 self.variable('Vento', 'wind-var'),
+                
+                html.Button("Exportar Tabela", id="export-button", n_clicks=0, title="Download Excel", className='update-button'),
+                dcc.Download(id="down-xlsx")
             ]),
             
             html.Div(className='third-row', children=[
                 self.graph(),
+                self.map(),
                 self.table(),
             ]),
         ])

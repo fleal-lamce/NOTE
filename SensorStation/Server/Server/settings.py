@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'Tables.Logs',
     'Tables.Devices',
+    'Tables.Areas',
 ]
 
 MIDDLEWARE = [

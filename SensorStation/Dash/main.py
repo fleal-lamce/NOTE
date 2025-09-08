@@ -1,10 +1,11 @@
 import pandas as pd
-from dash import Dash, html, Input, Output
+from dash import Dash, html, Input, Output, State
 from assets.index import Interface
 from objects.analysis.index import Analysis
 from objects.events.index import Events
 from objects.table.index import Table
 from objects.graph.index import LineGraph
+from objects.map.index import GeoMap
 
 
 class Dashboard:
@@ -14,6 +15,7 @@ class Dashboard:
         self.interface = Interface(self)
         self.table  = Table(self)
         self.graph  = LineGraph(self)
+        self.map    = GeoMap(self)
         self.events = Events()
 
         self.analysis.download()
@@ -43,11 +45,11 @@ class Dashboard:
             Input('update-button', 'n_clicks'),
             Input('var-select', 'value'),
             Input('area-select', 'value'),
-            Input('device-select', 'value')
+            Input('device-select', 'value'),
         ]
 
         @self.app.callback(outputs, inputs)
-        def render(n_clicks, varkey, area, device):
+        def render(btn1, varkey, area, device):
             if self.events.clicked('update-button'):
                 self.analysis.download()
 
@@ -59,7 +61,7 @@ class Dashboard:
             self.analysis.update()
             self.table.update()
             self.graph.update()
-            
+
             return [
                 f'LastSync: {self.analysis.curr_time}',
                 f'{self.analysis.temperature}ºC',
@@ -71,6 +73,15 @@ class Dashboard:
                 self.table.rows,
                 self.graph.fig,
             ]
+        
+        @self.app.callback(Output('rjmap', "figure"), Input('rjmap', "relayoutData"), State('rjmap', "figure"), State('rjmap-points', "data"))
+        def updateMap(relayout, current_fig, pontos):
+            self.map.update(relayout, current_fig, pontos)
+            return self.map.fig
+
+        @self.app.callback(Output("down-xlsx", "data"), Input("export-button", "n_clicks"), prevent_initial_call=True)
+        def downloadTable(n_clicks):
+            return self.table.download()
 
 
 if __name__ == '__main__':

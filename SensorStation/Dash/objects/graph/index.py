@@ -47,10 +47,9 @@ class LineGraph:
                 fillcolor=fill,
                 line=dict(color="rgba(0,0,0,0)"),
                 hoverinfo="skip",
-                showlegend=False
+                showlegend=False,
             ))
 
-        # Line on top
         fig.add_trace(go.Scatter(
             x=x, y=y, mode="lines",
             line=dict(width=3, color=color),
@@ -58,13 +57,21 @@ class LineGraph:
         ))
 
         fig.update_layout(
-            margin=dict(l=12, r=12, t=6, b=6),
+            margin=dict(l=12, r=12, t=12, b=6),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="#0c1628",
             xaxis=dict(showgrid=False, color="#94a3b8"),
             yaxis=dict(showgrid=False, color="#94a3b8", title=''),
             font=dict(color="#e5e7eb"),
-            hovermode="x unified"
+            hovermode="x unified",
+            legend=dict(
+                yanchor="bottom",  # ancora embaixo
+                y=0.02,            # mais para baixo (0=base do plot, 1=topo)
+                xanchor="right",
+                x=0.98,            # perto da direita
+                bgcolor="rgba(0,0,0,0)",
+                font=dict(size=11, color="#e5e7eb")
+            )
         )
 
         self.fig  = fig

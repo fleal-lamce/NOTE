@@ -3,6 +3,7 @@ from django.apps import apps
 from django.db import connection
 from Utils.functions import sendEvent
 from Tables.Logs.models import Log
+from Tables.Areas.models import Area
 
 
 class API:
@@ -11,6 +12,9 @@ class API:
     def getModel(self, name):
         if name == 'logs':
             return Log
+        
+        if name == 'areas':
+            return Area
         
         return None
 
@@ -54,8 +58,10 @@ class API:
             if isinstance(data, str):
                 data = orjson.loads(data.strip())
             
+            target = {key: value for key, value in data.items() if key in self.columns(table)}
             print('to insert: ', data)
-            instance = model.objects.create(**data)
+
+            instance = model.objects.create(**target)
             instance.save()
         except Exception as error:
             sendEvent('error', error)

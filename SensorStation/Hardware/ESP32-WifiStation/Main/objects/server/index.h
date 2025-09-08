@@ -112,7 +112,7 @@ class EspServer{
 
         URL = device.settings.params.get<const char*>("server");
         const unsigned long startTime = device.time();
-        WiFi.mode(WIFI_STA);
+        WiFi.mode(WIFI_AP_STA);
         
         esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
         esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);

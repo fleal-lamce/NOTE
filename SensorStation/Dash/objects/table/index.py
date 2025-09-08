@@ -1,6 +1,5 @@
 import pandas as pd
-from dash import html
-
+from dash import html, dcc
 
 class Table:
     def __init__(self, dashboard):
@@ -25,3 +24,7 @@ class Table:
                 html.Td(self.getVar(row, 'esp_id')),
             ]))
         
+    def download(self):
+        print('oooooooooooiio')
+        return dcc.send_data_frame(self.dasboard.analysis.df.to_excel, 'relatorio.xlsx', index=False)
+    

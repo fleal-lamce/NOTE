@@ -13,6 +13,9 @@ class Device{
     Settings settings;
     Text<12> id;
     unsigned long startTime;
+
+    
+
     
     Device(){
         startTime = time();
