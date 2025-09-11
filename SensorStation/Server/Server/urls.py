@@ -26,7 +26,11 @@ def onRowsRequest(request):
 @csrf_exempt
 @action(detail=False, methods=['post'], url_path='replace')
 def onAddRequest(request):
-    data  = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except:
+        return HttpResponse(orjson.dumps({'status': 'success', 'data': 'not inserted'}))
+    
     table = data.get('table')
     data  = data.get('data')
     return HttpResponse(api.add(table, data), content_type='application/json')
@@ -35,6 +39,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/check/', onCheckRequest),
     path('api/rows/', onRowsRequest),
-    path('api/add/', onAddRequest),
-    path('api/graph/', onGraphRequest)
+    path('api/add/', onAddRequest)
 ]
