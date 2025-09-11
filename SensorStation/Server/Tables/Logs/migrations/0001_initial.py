@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name='Log',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('data', models.JSONField()),
+                ('data', models.JSONField(default={})),
             ],
         ),
     ]

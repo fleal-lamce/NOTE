@@ -4,27 +4,37 @@
 #include "../../globals/constants.h"
 #include "../../globals/functions.h"
 #include "../../utils/text/index.h"
-#include "settings.h"
+#include "settings/index.h"
+
+#include "../server/index.h"
+#include "../logs/index.h"
+#include "../sensors/index.h"
+#include "../telemetry/index.h"
 
 
 class Device{
   public:
     const byte mode = MISTER_MODE;
+    unsigned long startTime;
     Settings settings;
     Text<12> id;
-    unsigned long startTime;
 
-    
+    Telemetry<Device> telemetry;
+    EspServer<Device> server;
+    Sensors<Device> sensors;
+    Logs<Device> logs;
 
-    
-    Device(){
-        startTime = time();
-        id.concat(getID());
-    }
+    Device():
+        telemetry(this),
+        logs(this),
+        sensors(this),
+        server(this){}
 
     void setup(){
-        sleep(1000);
-        Serial.println("Device Started: " + getID());
+        snprintf(id.buffer, sizeof(id.buffer), "%04X%08X", (uint16_t)(ESP.getEfuseMac() >> 32), (uint32_t)ESP.getEfuseMac());
+        Serial.println("Device Started: " + id.toString());
+        settings.import();
+        logs.setup();
         
         if(mode == MASTER_MODE)
             Serial.println("Modo Master Ativo");
@@ -35,33 +45,18 @@ class Device{
         if(mode == MISTER_MODE)
             Serial.println("Modo Misto Ativo");
 
-        settings.import();
+        if(mode == MASTER_MODE || mode == MISTER_MODE)
+            server.connect();
+        
+        if(mode == SLAVE_MODE || mode == MISTER_MODE)
+            sensors.setup();
     }
 
-    unsigned long time(){
-        return esp_timer_get_time()/1000;
-    }
-
-    float alive(){
-        return (time() - startTime)/1000.0;
-    }
-
-    void sleep(const int timeout){
-        delay(timeout);
-    }
-    
     void reset(){
         ESP.restart();
     }
-
-    String getID() {
-        char chip_id[17];
-        snprintf(chip_id, sizeof(chip_id), "%04X%08X",
-                (uint16_t)(ESP.getEfuseMac() >> 32),
-                (uint32_t)ESP.getEfuseMac());
-        return String(chip_id);
-    }
 };
+
 
 inline Device device;
 #endif

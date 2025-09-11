@@ -1,28 +1,8 @@
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-import re, os
+import re, os, sqlite3
 import plotly.io as pio
-
-
-mapINFO = [
-    {
-        "nome": "LAMCE/GRVA - COPPE/UFRJ",
-        # Rua Sydiney Martins Gomes dos Santos, 179 (Parque Tecnológico)
-        # fonte das coords da rua: guiamapa
-        "lat": -22.862688,
-        "lon": -43.225895,
-        "label": "**LAMCE/GRVA – COPPE/UFRJ**\nParque Tecnológico da UFRJ."
-    },
-    {
-        "nome": "Píer (ao lado do LAMCE)",
-        # APROXIMADO — ajuste se tiver as coords exatas do píer
-        "lat": -22.861900,
-        "lon": -43.224800,
-        "label": "**Píer ao lado do LAMCE**\nPonto de referência na orla."
-    },
-]
-
 
 
 def getPDF(markdown):
@@ -36,17 +16,21 @@ class GeoMap:
     center = {"lat": -22.8610, "lon": -43.2230} 
 
     def __init__(self, dashboard):
+        self.locations = pd.read_sql_query('SELECT * FROM Locations_location', sqlite3.connect('../Server/db.sqlite3')).rename(columns={"lng": "lon"})
+        self.locations = [row.to_dict() for i, row in self.locations.iterrows()]
+        print(self.locations)
+
         self.dashboard = dashboard
-        self.df = pd.DataFrame(mapINFO)
+        self.df = pd.DataFrame(self.locations)
         self.df['hover_html'] = self.df.label.map(getPDF)
 
         self.fig = px.scatter_mapbox(
             self.df,
             lat="lat",
             lon="lon",
-            hover_name="nome",
+            hover_name="label",
             hover_data=None,
-            custom_data=["hover_html", "nome"],  # 0=html, 1=nome
+            custom_data=["hover_html", "label"],  # 0=html, 1=nome
             zoom=12,
             center=self.center,
         )
@@ -78,7 +62,7 @@ class GeoMap:
             zoom = current_fig.get("layout", {}).get("mapbox", {}).get("zoom", 10)
 
         show_labels = zoom >= 12  # ajuste seu limiar
-        text_values = [p["nome"] for p in pontos] if show_labels else [None] * len(pontos)
+        text_values = [p["label"] for p in pontos] if show_labels else [None] * len(pontos)
         self.fig.update_traces(text=text_values, textposition="top right")
 
         marker_size = 10 if zoom < 13 else 12

@@ -1,6 +1,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
-#include "../../utils/json/index.h"
+#include "../../../utils/json/index.h"
 
 
 class Settings{
@@ -17,6 +17,10 @@ class Settings{
         }
         
         erase();
+    }
+
+    template<typename T> T get(const char* key) const {
+        return params.template get<T>(key);
     }
 
     void save(){

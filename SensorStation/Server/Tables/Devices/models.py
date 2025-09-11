@@ -6,7 +6,7 @@ class Device(models.Model):
     esp_id = models.CharField(max_length=12, default='')
     area = models.IntegerField(default=0)
     node = models.CharField(max_length=50, default='')
-    variables = models.JSONField()
+    variables = models.JSONField(default={})
     timestamp = models.DateTimeField(default=timezone.now, editable=False)
     master = models.BooleanField(default=False)
 

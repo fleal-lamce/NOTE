@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     'Tables.Logs',
     'Tables.Devices',
     'Tables.Areas',
+    'Tables.Locations'
 ]
 
 MIDDLEWARE = [

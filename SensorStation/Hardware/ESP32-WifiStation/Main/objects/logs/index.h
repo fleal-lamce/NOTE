@@ -1,16 +1,19 @@
 #ifndef SERVER_LOGS_H
 #define SERVER_LOGS_H
-#include "../../globals/dataset/index.h"
-#include "../device/index.h"
+#include "../dataset/index.h"
 #include "../../utils/notes/index.h"
-#include "../sensors/index.h"
-#include "../server/index.h"
 //#include "../wireless/heltec/index.h"
 
 
-class Logs{
-  public:
+template <typename Parent> class Logs{
+  private:
+    //HeltecLora heltec;
     Notes notes = Notes("/txt");
+    Parent* device;
+    
+  public:
+    Logs(Parent* dev):
+        device(dev){}
 
     void setup(){
         Serial.println("Setting Up Notes");
@@ -20,11 +23,10 @@ class Logs{
     }
 
     void handle(){
-        if(device.mode == SLAVE_MODE  || device.mode == MISTER_MODE){
+        if(device->mode == SLAVE_MODE  || device->mode == MISTER_MODE)
             handleSender();
-        }
         
-        if(device.mode == MASTER_MODE || device.mode == MISTER_MODE){
+        if(device->mode == MASTER_MODE || device->mode == MISTER_MODE){
             handleStore();
             handleServer();
         }
@@ -36,11 +38,11 @@ class Logs{
         if(!listener.ready())
             return;
 
-        if(!sensors.available)
+        if(!device->sensors.available)
             return;
         
         //heltec.send(dataset.info); 
-        sensors.available = false;
+        device->sensors.available = false;
         Serial.println("(log) sent: " + dataset.toString());
     }
 
@@ -62,7 +64,7 @@ class Logs{
         if(!listener.ready())
             return;
 
-        if(!server.active)
+        if(!device->server.active)
             return;
         
         send();
@@ -70,7 +72,7 @@ class Logs{
 
     void store(){
         const int size = notes.length();
-        String log = dataset.toString();
+        String log     = dataset.toString();
 
         Serial.println("(log) stored: " + log);
         Serial.println("(log) notes size: " + String(size));
@@ -85,7 +87,7 @@ class Logs{
     void send(){
         while(notes.length() > 10){ 
             String log    = notes.readlines(1);
-            String result = server.post("add/", log);
+            String result = device->server.post("add/", log);
             Serial.println("(server) log:      " + log);
             Serial.println("(server) response: " + result);
             Serial.println();
@@ -99,6 +101,4 @@ class Logs{
     }
 };
 
-
-inline Logs logs;
 #endif

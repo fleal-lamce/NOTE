@@ -1,9 +1,9 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 #include <Arduino.h>
-#include "../../utils/text/index.h"
-#include "../device/index.h"
-#include "../../utils/listener/index.h"
+#include "../../../utils/text/index.h"
+#include "../../../utils/listener/index.h"
+#include "../../../utils/time/index.h"
 
 #define CMD_MIN_SIZE 5
 #define IS_DEBUG false
@@ -34,8 +34,8 @@ template<int CMD_SIZE> class NextSerial{
         if(!junk)
             reset();
         
-        const unsigned long startTime = device.time();
-        while(uart.available() && device.time() - startTime < timeout){
+        const unsigned long startTime = Time::get();
+        while(uart.available() && Time::get() - startTime < timeout){
             const char letter = (char) uart.read();
             
             if(junk)
@@ -56,14 +56,32 @@ template<int CMD_SIZE> class NextSerial{
             uart.write("\r\n");
     }
 
+    void send(String msg, bool breakLine=true){
+        Serial.println("(sending) " + String(msg));
+        uart.write(msg.c_str());
+
+        if(breakLine)
+            uart.write("\r\n");
+    }
+
+    void clean(){
+        command.remove(' ');
+        command.remove('\r');
+        command.remove('\n');
+        command.remove('\t');
+
+        if(command.length() < 5 || command.length() > CMD_SIZE)
+            reset();
+    }
+
     void print(){
         Serial.println(available ? "(received) " + command.toString() : "nothing received");
     }
 
     void await(const int ms){
-        const unsigned long startTime = device.time();
+        const unsigned long startTime = Time::get();
 
-        while(device.time() - startTime < ms)
+        while(Time::get() - startTime < ms)
             listen();
     }
     

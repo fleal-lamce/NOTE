@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Device',
             fields=[
-                ('variables', models.JSONField()),
+                ('variables', models.JSONField(default={})),
                 ('id', models.AutoField(editable=False, primary_key=True, serialize=False, unique=True)),
                 ('esp_id', models.CharField(default='', max_length=12)),
                 ('timestamp', models.DateTimeField(default=django.utils.timezone.now, editable=False)),
