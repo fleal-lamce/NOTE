@@ -66,15 +66,14 @@ class Analysis:
         return s.iloc[-1] if not s.empty else errors
 
     def getID(self, id):
-        target = self.ALL_DEVICES.loc[self.ALL_DEVICES.esp_id == id]
-
-        if len(target) == 0:
+        target_devices = self.ALL_DEVICES.loc[self.ALL_DEVICES.esp_id == id]
+        
+        if len(target_devices) == 0:
             return None
 
-        node   = self.ALL_DEVICES.iloc[0].node
-        area   = self.ALL_DEVICES.iloc[0].area
+        node   = target_devices.iloc[0].node
+        area   = target_devices.iloc[0].area
         target = self.ALL_AREAS.loc[self.ALL_AREAS.value == area]
-        
         
         if len(target) == 0:
             return None

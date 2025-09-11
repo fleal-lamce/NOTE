@@ -32,7 +32,7 @@ class Device{
 
     void setup(){
         snprintf(id.buffer, sizeof(id.buffer), "%04X%08X", (uint16_t)(ESP.getEfuseMac() >> 32), (uint32_t)ESP.getEfuseMac());
-        Serial.println("Device Started: " + id.toString());
+        Serial.print("Device Started: "); Serial.print(id.get());
         settings.import();
         logs.setup();
         

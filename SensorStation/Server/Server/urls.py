@@ -28,8 +28,8 @@ def onRowsRequest(request):
 def onAddRequest(request):
     try:
         data = json.loads(request.body)
-    except:
-        return HttpResponse(orjson.dumps({'status': 'success', 'data': 'not inserted'}))
+    except Exception as error:
+        return HttpResponse(orjson.dumps({'status': 'success', 'data': f'not inserted: {error}'}))
     
     table = data.get('table')
     data  = data.get('data')
