@@ -19,9 +19,10 @@ from PIL import Image
 import GOES
 import multiprocessing as mp
 import xarray as xr
-
-
-
+import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
+from datetime import timedelta
 
 def check_nas_space(path, min_gb_free=10):
     """
@@ -38,28 +39,16 @@ def check_nas_space(path, min_gb_free=10):
         logging.error(f"Erro ao verificar espaço do NAS ({path}): {e}")
         return False
 
-
-
-
-
-
-
-
 # Diretórios
 INCOMING_DIR  = r"Y:\incoming\GOES-R-CMI-Imagery"
 ORGANIZED_DIR = r"Y:\GOES-Organized"
 LOGO_LEFT_PATH  = r"C:\Users\ire0349s\Downloads\assVisual_LAMCE_COR_SemTextoTransparente.png"
 LOGO_RIGHT_PATH = r"C:\Users\ire0349s\Downloads\BaiaDigital-03.png"
-
-
 logo_left_img = plt.imread(LOGO_LEFT_PATH)
 logo_right_img = plt.imread(LOGO_RIGHT_PATH)
 DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
 DOMAIN_SUDESTE = [-54.0, -32.0, -27.5, -13.0]
 CHECK_INTERVAL = 60  # segundos entre varreduras
-
-
-
 
 def safe_remove(path, retries=6, delay=0.5):
     """
@@ -83,9 +72,6 @@ def safe_remove(path, retries=6, delay=0.5):
             time.sleep(delay)
     return False
 
-
-
-
 def recortar_e_salvar_netcdf(nc_path, destino_dir, timestamp_utc):
     """
     Recorta o NetCDF para o domínio do Brasil (DOMAIN) usando as grades Lon/Lat
@@ -103,8 +89,6 @@ def recortar_e_salvar_netcdf(nc_path, destino_dir, timestamp_utc):
             else:
                 logging.warning(f"Arquivo não encontrado para recorte: {nc_path} (também não em {candidate})")
                 return None
-
-
         # 2) Obter Lon/Lat na grade completa (e liberar o handle do GOES depois)
         try:
             ds_goes = GOES.open_dataset(actual_path)
@@ -124,17 +108,11 @@ def recortar_e_salvar_netcdf(nc_path, destino_dir, timestamp_utc):
             except Exception:
                 pass
             ds_goes = None
-
-
         # 3) Normalizar longitudes para mesma convenção do dado
         lon_max = np.nanmax(lon2d)
         uses_360 = lon_max > 180.0
-
-
         def to_360(l):
             return l + 360.0 if l < 0 else l
-
-
         if uses_360:
             dom_lon_min = to_360(DOMAIN[0])
             dom_lon_max = to_360(DOMAIN[1])
@@ -143,48 +121,32 @@ def recortar_e_salvar_netcdf(nc_path, destino_dir, timestamp_utc):
             dom_lon_min = DOMAIN[0]
             dom_lon_max = DOMAIN[1]
             lon_data = np.where(lon2d > 180.0, lon2d - 360.0, lon2d)
-
-
         dom_lat_min = DOMAIN[2]
         dom_lat_max = DOMAIN[3]
-
-
         # 4) Máscara do domínio (com suporte a wrap 0/360)
         if uses_360 and dom_lon_min > dom_lon_max:
             lon_mask = (lon_data >= dom_lon_min) | (lon_data <= dom_lon_max)
         else:
             lon_mask = (lon_data >= dom_lon_min) & (lon_data <= dom_lon_max)
-
-
         lat_mask = (lat2d >= dom_lat_min) & (lat2d <= dom_lat_max)
         mask = lon_mask & lat_mask
-
-
         if not np.any(mask):
             raise ValueError("Recorte vazio — nenhum dado no domínio definido. (Verifique convenção de longitudes)")
-
-
         # 5) Caixa mínima em índices
         ys, xs = np.where(mask)
         y_min, y_max = int(ys.min()), int(ys.max())
         x_min, x_max = int(xs.min()), int(xs.max())
-
-
         # 6) Abrir com xarray e recortar por índice
         ds = xr.open_dataset(actual_path)
         try:
             if not set(['x', 'y']).issubset(ds.dims):
                 raise ValueError("Arquivo não possui dimensões 'x' e 'y' como esperado.")
             ds_recorte = ds.isel(y=slice(y_min, y_max + 1), x=slice(x_min, x_max + 1))
-
-
             # 7) Salvar
             os.makedirs(destino_dir, exist_ok=True)
             nome_recorte = f"recorte_{timestamp_utc.strftime('%Y-%m-%d_%H-%M')}_UTC_{os.path.basename(actual_path)}"
             caminho_final = os.path.join(destino_dir, nome_recorte)
             ds_recorte.to_netcdf(caminho_final)
-
-
             # Fechar recorte
             ds_recorte.close()
         finally:
@@ -192,21 +154,13 @@ def recortar_e_salvar_netcdf(nc_path, destino_dir, timestamp_utc):
             ds.close()
             del ds
             gc.collect()
-
-
         return caminho_final
-
-
     except Exception as e:
         logging.warning(f"Erro ao recortar e salvar NetCDF: {nc_path} → {e}")
         return None
 # Logging
 for handler in logging.root.handlers[:]:
     logging.root.removeHandler(handler)
-
-
-
-
 LOG_PATH = os.path.abspath("goes_loop.log")
 logging.basicConfig(
     filename=LOG_PATH,
@@ -214,33 +168,17 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s: %(message)s',
     filemode='a'  # ou 'w' se quiser sobrescrever toda vez
 )
-
-
-
-
 logging.info("Logger configurado e iniciado com sucesso.")
-
-
-
-
 # Parte 2: Colormaps exatos para cada banda
 def reflectance_cmap(name):
     return mcolors.LinearSegmentedColormap.from_list(name, [
         (0.0, "#000000"), (1.0, "#FFFFFF")
     ])
-
-
-
-
 cmap_band07 = mcolors.LinearSegmentedColormap.from_list(
     "Band07",
     ["#00FFFF", "#000000", "#FFFFFF"],
     N=256,
 )
-
-
-
-
 temps_8_10 = [-90, -80, -70, -60, -50, -40, -35, -30, -25, -20, -15, -10, -5, -2.5, 0]
 colors_8_10 = [
     "#ffffff", "#00ffff", "#00ff00", "#0000ff", "#dddddd", "#cccccc", "#aaaaaa", "#aa5500",
@@ -248,10 +186,6 @@ colors_8_10 = [
 ]
 norm_8_10 = mcolors.Normalize(vmin=min(temps_8_10), vmax=max(temps_8_10))
 cmap_band08 = mcolors.LinearSegmentedColormap.from_list("Band08", list(zip(norm_8_10(temps_8_10), colors_8_10)), N=256)
-
-
-
-
 temps_ir_std = [-90, -80, -70, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40]
 colors_ir_std = [
     "#ff0000", "#ff8000", "#ffff00", "#00ff00", "#00ffff", "#70a0ff", "#a0c0ff", "#b0d0ff",
@@ -259,10 +193,6 @@ colors_ir_std = [
 ]
 norm_ir_std = mcolors.Normalize(vmin=min(temps_ir_std), vmax=max(temps_ir_std))
 cmap_ir_standard = mcolors.LinearSegmentedColormap.from_list("IRStandard", list(zip(norm_ir_std(temps_ir_std), colors_ir_std)), N=256)
-
-
-
-
 temps_15 = temps_ir_std
 colors_15 = [
     "#0000ff", "#4b0082", "#00ffff", "#00ff00", "#adff2f", "#ffff00", "#ff8000", "#ff0000",
@@ -270,10 +200,6 @@ colors_15 = [
 ]
 norm_15 = mcolors.Normalize(vmin=min(temps_15), vmax=max(temps_15))
 cmap_band15 = mcolors.LinearSegmentedColormap.from_list("Band15", list(zip(norm_15(temps_15), colors_15)), N=256)
-
-
-
-
 colormaps = {
     1: "Blue Visible", 2: "Red Visible", 3: "Veggie (Near-IR)", 4: "Cirrus (Near-IR)",
     5: "Snow/Ice (Near-IR)", 6: "Cloud Particle Size (Near-IR)", 7: "Shortwave IR",
@@ -281,20 +207,12 @@ colormaps = {
     11: "Cloud-Top Phase IR", 12: "Ozone IR", 13: "Clean Longwave IR",
     14: "IR Longwave Window", 15: "Dirty Longwave IR", 16: "CO₂ Longwave IR"
 }
-
-
-
-
 vmin_vmax = {
     **{i: (0, 100) for i in range(1, 7)},
     7: (-90, 100),
     **{i: (-90, 0) for i in [8, 9, 10]},
     **{i: (-90, 40) for i in [11, 12, 13, 14, 15, 16]}
 }
-
-
-
-
 cmap_lookup = {
     1: reflectance_cmap("Band01"), 2: reflectance_cmap("Band02"), 3: reflectance_cmap("Band03"),
     4: reflectance_cmap("Band04"), 5: reflectance_cmap("Band05"), 6: reflectance_cmap("Band06"),
@@ -302,10 +220,6 @@ cmap_lookup = {
     11: cmap_ir_standard, 12: cmap_ir_standard, 13: cmap_ir_standard,
     14: cmap_ir_standard, 15: cmap_band15, 16: cmap_ir_standard
 }
-
-
-
-
 # Parte 3: Função de logo modificada
 def add_logo_on_map(ax, logo_img, lon, lat, width_deg=5, anchor='bottom-left'):
     try:
@@ -315,19 +229,11 @@ def add_logo_on_map(ax, logo_img, lon, lat, width_deg=5, anchor='bottom-left'):
         right = lon + width_deg
         bottom = lat
         top = lat + height_deg
-
-
-
-
         if anchor == 'top-right':
             left = lon - width_deg
             bottom = lat - height_deg
             top = lat
             right = lon
-
-
-
-
         ax.imshow(
             logo_img,
             extent=(left, right, bottom, top),
@@ -339,14 +245,9 @@ def add_logo_on_map(ax, logo_img, lon, lat, width_deg=5, anchor='bottom-left'):
     except Exception as e:
         logging.warning(f"Erro ao posicionar logo em ({lon}, {lat}): {e}")
 
-
-
-
 def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumentos diretamente
     try:
         ds = GOES.open_dataset(nc_path)
-
-
         try:
             result = ds.image('CMI', lonlat='corner', domain=DOMAIN)
             if result is None or any(r is None for r in result):
@@ -358,11 +259,7 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
                 except Exception:
                     pass
                 return
-
-
             CMI, Lon, Lat = result
-
-
             if CMI.data is None or np.all(np.isnan(CMI.data)):
                 logging.warning(f"CMI inválido ou vazio no arquivo {nc_path}")
                 try:
@@ -371,8 +268,6 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
                 except Exception:
                     pass
                 return
-
-
             if not hasattr(CMI, 'time_bounds') or CMI.time_bounds.data is None:
                 logging.warning(f"Arquivo {nc_path} sem time_bounds definido.")
                 try:
@@ -381,8 +276,6 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
                 except Exception:
                     pass
                 return
-
-
         except Exception as e:
             logging.warning(f"Erro ao extrair CMI/Lon/Lat de {nc_path}: {e}")
             try:
@@ -391,21 +284,15 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
             except Exception:
                 pass
             return
-
-
         # Copiar arrays para desacoplar do arquivo
         data = np.array(CMI.data, dtype=float, copy=True)
         Lon_data = np.array(Lon.data, copy=True)
         Lat_data = np.array(Lat.data, copy=True)
-
-
         # Metadados necessários antes de fechar o GOES dataset
         band_id = ds.variable('band_id').data[0]
         wl = ds.variable('band_wavelength').data[0]
         platform = ds.attribute("platform_ID")
         utc_dt = CMI.time_bounds.data[0]
-
-
         # Fechar explicitamente o dataset GOES o quanto antes
         try:
             if hasattr(ds, "close"):
@@ -414,21 +301,13 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
             pass
         ds = None
         gc.collect()
-
-
         if band_num >= 7:
             data -= 273.15
         else:
             data *= 100
-
-
         cmap = cmap_lookup[band_num]
         vmin, vmax = vmin_vmax[band_num]
-
-
         product = colormaps.get(band_num, "Unknown")
-
-
         # ---------- Gráfico Brasil ----------
         fig = plt.figure(figsize=(12, 9), dpi=200)
         gs = fig.add_gridspec(nrows=20, ncols=24)
@@ -440,30 +319,20 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
         cb = plt.colorbar(mesh, cax=cbar_ax, orientation='horizontal', extend='both')
         cb.set_label('Brightness Temperature (°C)' if band_num >= 7 else 'Reflectance (%)', size=9)
         cb.ax.tick_params(labelsize=8)
-
-
         if isinstance(utc_dt, np.datetime64):
             utc_dt = datetime.strptime(str(utc_dt)[:19], '%Y-%m-%dT%H:%M:%S')
         if utc_dt.tzinfo is None or utc_dt.tzinfo.utcoffset(utc_dt) is None:
             utc_dt = utc_dt.replace(tzinfo=timezone.utc)
-
-
         fig.suptitle(f'{platform} - Band {band_id:02d}: {product}\n'
                      f'{utc_dt.strftime("%Y-%m-%d %H:%M UTC")}\n{wl:.1f} µm',
                      y=0.98, fontsize=8, linespacing=1.5)
-
-
         ax.add_feature(cfeature.NaturalEarthFeature('cultural', 'admin_0_countries', '50m', facecolor='none'),
                        edgecolor='white', linewidth=0.8)
         ax.gridlines(draw_labels=False, linestyle='--', alpha=0.7)
         ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
         ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
-
-
         add_logo_on_map(ax, logo_left_img, lon=DOMAIN[0] + 1.0, lat=DOMAIN[2] + 1.5, width_deg=13.5)
         add_logo_on_map(ax, logo_right_img, lon=DOMAIN[1] - 1.0, lat=DOMAIN[3] - 0.5, width_deg=14.5, anchor='top-right')
-
-
         out_dir = os.path.join(ORGANIZED_DIR, band_folder, f"{utc_dt.year:04d}", f"{utc_dt.month:02d}", f"{utc_dt.day:02d}")
         timestamp_str = utc_dt.strftime('%Y-%m-%d_%H-%M')
         jpeg_name = f'{timestamp_str}_Band{band_num:02d}_Brasil_{os.path.basename(nc_path).replace(".nc", "")}.jpg'
@@ -473,8 +342,6 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
         fig.clf()
         plt.close(fig)
         gc.collect()
-
-
         # ---------- Gráfico Sudeste ----------
         fig = plt.figure(figsize=(12, 9), dpi=200)
         gs = fig.add_gridspec(nrows=20, ncols=24)
@@ -486,25 +353,17 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
         cb = plt.colorbar(mesh, cax=cbar_ax, orientation='horizontal', extend='both')
         cb.set_label('Brightness Temperature (°C)' if band_num >= 7 else 'Reflectance (%)', size=9)
         cb.ax.tick_params(labelsize=8)
-
-
         fig.suptitle(f'{platform} - Band {band_id:02d}: {product}\n'
                      f'{utc_dt.strftime("%Y-%m-%d %H:%M UTC")}\n{wl:.1f} µm',
                      y=0.98, fontsize=8, linespacing=1.5)
-
-
         ax.add_feature(cfeature.NaturalEarthFeature('cultural', 'admin_0_countries', '50m', facecolor='none'),
                        edgecolor='white', linewidth=0.8)
         ax.add_feature(cfeature.STATES, edgecolor='white', linewidth=0.5)
         ax.gridlines(draw_labels=False, linestyle='--', alpha=0.7)
         ax.xaxis.set_major_formatter(LongitudeFormatter(number_format='.0f°'))
         ax.yaxis.set_major_formatter(LatitudeFormatter(number_format='.0f°'))
-
-
         add_logo_on_map(ax, logo_left_img, lon=DOMAIN_SUDESTE[0] + 1.0, lat=DOMAIN_SUDESTE[2] + 1.0, width_deg=4.5)
         add_logo_on_map(ax, logo_right_img, lon=DOMAIN_SUDESTE[1] - 1.0, lat=DOMAIN_SUDESTE[3] - 0.5, width_deg=5.5, anchor='top-right')
-
-
         jpeg_sudeste_name = f'{timestamp_str}_Band{band_num:02d}_Sudeste_{os.path.basename(nc_path).replace(".nc", "")}.jpg'
         jpeg_sudeste_dir = os.path.join(out_dir, 'Sudeste')
         os.makedirs(jpeg_sudeste_dir, exist_ok=True)
@@ -513,17 +372,11 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
         fig.clf()
         plt.close(fig)
         gc.collect()
-
-
         # ---------- Recorte e movimentação ----------
         recorte_dir = os.path.join(out_dir, "NetCDF")
         os.makedirs(recorte_dir, exist_ok=True)
-
-
         # 1) Tentar recortar primeiro (a partir do caminho original)
         caminho_recortado = recortar_e_salvar_netcdf(nc_path, recorte_dir, utc_dt)
-
-
         if caminho_recortado:
             # Recorte OK -> remover original SE ainda existir (com retry)
             if not safe_remove(nc_path):
@@ -541,21 +394,9 @@ def process_nc_file(band_num, band_folder, nc_path):  # <- recebe os 3 argumento
                 logging.warning(f"Falha ao mover original após falha de recorte (em uso) {nc_path}: {e}")
             except Exception as e:
                 logging.warning(f"Falha ao mover original como backup ({nc_path}): {e}")
-
-
         logging.info(f"Processado NetCDF: {nc_path} → JPEGs: {jpeg_path}, {jpeg_sudeste_path}")
-
-
     except Exception as e:
         logging.exception(f"Erro ao processar {nc_path}: {e}")
-
-
-
-
-from datetime import timedelta
-
-
-
 
 def limpar_arquivos_antigos(base_dir, dias_para_manter):
     """
@@ -564,44 +405,24 @@ def limpar_arquivos_antigos(base_dir, dias_para_manter):
     """
     hoje = datetime.utcnow().date()
     limite = hoje - timedelta(days=dias_para_manter)
-
-
-
-
     for banda in os.listdir(base_dir):
         banda_path = os.path.join(base_dir, banda)
         if not os.path.isdir(banda_path):
             continue
-
-
-
-
         for ano in os.listdir(banda_path):
             ano_path = os.path.join(banda_path, ano)
             if not ano.isdigit():
                 continue
-
-
-
-
             for mes in os.listdir(ano_path):
                 mes_path = os.path.join(ano_path, mes)
                 if not mes.isdigit():
                     continue
-
-
-
-
                 for dia in os.listdir(mes_path):
                     dia_path = os.path.join(mes_path, dia)
                     try:
                         data_pasta = datetime.strptime(f"{ano}-{mes}-{dia}", "%Y-%m-%d").date()
                     except ValueError:
                         continue
-
-
-
-
                     if data_pasta < limite:
                         try:
                             shutil.rmtree(dia_path)
@@ -620,29 +441,13 @@ if __name__ == "__main__":
                 if not m: continue
                 band_num = int(m.group(1))
                 if band_num not in colormaps: continue
-
-
-
-
                 for nc_path in sorted(glob.glob(os.path.join(band_path, '*.nc'))):
                     args_list.append((band_num, band_folder, nc_path))
-
-
-
-
             if args_list:
                 with mp.Pool(processes=12) as pool:
                     pool.starmap(process_nc_file, args_list)
-
-
-
-
         except Exception:
             logging.exception("Fatal error in main loop")
-
-
-
-
         try:
             import subprocess
             powershell_script = r"C:\scripts\sync_goes_to_nas.ps1"
@@ -658,10 +463,6 @@ if __name__ == "__main__":
             logging.error(f"Falha no PowerShell: código de saída {e.returncode}")
         except Exception as e:
             logging.exception(f"Erro inesperado na sincronização com NAS: {e}")
-
-
-
-
         try:
             limpar_arquivos_antigos(ORGANIZED_DIR, dias_para_manter=7)
             limpar_arquivos_antigos(r"Z:\GOES_Organized", dias_para_manter=178)
