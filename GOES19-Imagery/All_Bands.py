@@ -49,6 +49,10 @@ logo_right_img = plt.imread(LOGO_RIGHT_PATH)
 DOMAIN        = [-73.9906, -26.5928, -33.7520, 6.2720]
 DOMAIN_SUDESTE = [-54.0, -32.0, -27.5, -13.0]
 CHECK_INTERVAL = 60  # segundos entre varreduras
+AWS_BUCKET = 'noaa-goes19'
+AWS_PRODUCT = 'ABI-L2-CMIPF'  # Confirmado para o seu tipo de dado (Nível 2)
+INTERVALO_ESPERADO_MINUTOS = 10 # Intervalo entre os scans (confirmado pelos seus exemplos)
+GRACE_PERIOD_MINUTES = 30     # Tempo de espera antes de considerar um arquivo "faltante"
 
 def safe_remove(path, retries=6, delay=0.5):
     """
@@ -429,25 +433,155 @@ def limpar_arquivos_antigos(base_dir, dias_para_manter):
                             logging.info(f"Apagada pasta antiga: {dia_path}")
                         except Exception as e:
                             logging.warning(f"Erro ao apagar {dia_path}: {e}")
+
+def get_latest_processed_timestamp(band_num):
+    """
+    Encontra o timestamp UTC do último arquivo processado para uma banda específica,
+    analisando os JPEGs existentes.
+    """
+    band_folder = f"Band{band_num:02d}"
+    # Ajuste para nomes de pasta como "Band 01" (com espaço), se for o caso
+    if not os.path.exists(os.path.join(ORGANIZED_DIR, band_folder)):
+        band_folder_with_space = f"Band {band_num:02d}"
+        if os.path.exists(os.path.join(ORGANIZED_DIR, band_folder_with_space)):
+            band_folder = band_folder_with_space
+
+    search_pattern = os.path.join(ORGANIZED_DIR, band_folder, '*', '*', '*', 'Brasil', '*.jpg')
+    
+    list_of_files = glob.glob(search_pattern)
+    if not list_of_files:
+        return None # Nenhum arquivo processado ainda para esta banda
+
+    latest_file = max(list_of_files, key=os.path.getctime)
+    filename = os.path.basename(latest_file)
+    
+    # Extrai a data do nome do arquivo, ex: '2025-09-14_13-10_...'
+    match = re.match(r'(\d{4}-\d{2}-\d{2}_\d{2}-\d{2})', filename)
+    if match:
+        timestamp_str = match.group(1)
+        # Retorna como um objeto datetime com fuso horário
+        return datetime.strptime(timestamp_str, '%Y-%m-%d_%H-%M').replace(tzinfo=timezone.utc)
+    return None
+
+def verificar_e_preencher_lacunas_aws():
+    """
+    [VERSÃO DEFINITIVA]
+    A cada execução, verifica TODAS as lacunas nas últimas 24 horas e baixa os
+    arquivos faltantes de forma eficiente.
+    """
+    logging.info("Iniciando verificação de lacunas nas últimas 24h (lógica definitiva)...")
+    try:
+        s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+        now_utc = datetime.now(timezone.utc)
+        
+        # 1. Define a Janela de Tempo para verificação
+        end_scan = now_utc - timedelta(minutes=GRACE_PERIOD_MINUTES)
+        start_scan = now_utc - timedelta(hours=24)
+
+        # 2. Gera a lista de todos os timestamps esperados (a "Lista de Desejos")
+        expected_timestamps = set()
+        current_ts = start_scan.replace(minute=(start_scan.minute // 10) * 10, second=0, microsecond=0)
+        while current_ts <= end_scan:
+            expected_timestamps.add(current_ts.strftime('%Y-%m-%d_%H-%M'))
+            current_ts += timedelta(minutes=INTERVALO_ESPERADO_MINUTOS)
+
+        if not expected_timestamps:
+            logging.info("Nenhum timestamp a ser verificado na janela de tempo.")
+            return
+
+        # 3. Itera por cada banda para encontrar e preencher suas lacunas
+        for band_num in range(1, 17):
+            try:
+                # 4. Verifica o "Estoque": Pega todos os timestamps já processados para esta banda
+                processed_timestamps = set()
+                band_folder_name = next((d for d in os.listdir(ORGANIZED_DIR) if f"band{band_num:02d}" in d.lower().replace(" ", "")), f"Band {band_num:02d}")
+                
+                # Busca JPEGs de hoje e de ontem para cobrir a janela de 24h
+                for i in range(2):
+                    check_date = now_utc - timedelta(days=i)
+                    search_path = os.path.join(ORGANIZED_DIR, band_folder_name, check_date.strftime('%Y'), check_date.strftime('%m'), check_date.strftime('%d'), 'Brasil', '*.jpg')
+                    for f in glob.glob(search_path):
+                        match = re.match(r'(\d{4}-\d{2}-\d{2}_\d{2}-\d{2})', os.path.basename(f))
+                        if match:
+                            processed_timestamps.add(match.group(1))
+                
+                # 5. Compara as listas e identifica TODAS as lacunas
+                missing_timestamps_str = sorted(list(expected_timestamps - processed_timestamps))
+
+                if not missing_timestamps_str:
+                    #logging.info(f"Banda {band_num:02d} está 100% atualizada.")
+                    continue
+                
+                logging.warning(f"Banda {band_num:02d}: Encontradas {len(missing_timestamps_str)} lacunas nas últimas 24h. Preenchendo...")
+
+                # 6. Preenche as lacunas encontradas
+                for ts_str in missing_timestamps_str:
+                    ts_obj = datetime.strptime(ts_str, '%Y-%m-%d_%H-%M')
+                    ano, dia_juliano, hora, minuto = ts_obj.strftime('%Y'), ts_obj.strftime('%j'), ts_obj.strftime('%H'), ts_obj.minute
+
+                    s3_prefix = f"{AWS_PRODUCT}/{ano}/{dia_juliano}/{hora}/"
+                    response = s3.list_objects_v2(Bucket=AWS_BUCKET, Prefix=s3_prefix)
+
+                    if 'Contents' not in response: continue
+                    
+                    for obj in response['Contents']:
+                        filename = os.path.basename(obj['Key'])
+                        match = re.search(r'_s(\d{4}\d{3}\d{2}\d{2})', filename) # Compara YYYYJJJHHMM
+                        if match and f"C{band_num:02d}_G19_" in filename and match.group(1) == f"{ano}{dia_juliano}{hora}{minuto:02d}":
+                            key_to_download, filename_to_download = obj['Key'], filename
+                            
+                            incoming_band_folder = next((d for d in os.listdir(INCOMING_DIR) if f"band{band_num:02d}" in d.lower().replace(" ", "")), f"Band {band_num:02d}")
+                            destino_local_path = os.path.join(INCOMING_DIR, incoming_band_folder, filename_to_download)
+                            
+                            if os.path.exists(destino_local_path): break
+                            
+                            logging.info(f"Baixando lacuna de {ts_str} para Banda {band_num:02d}: {filename_to_download}")
+                            s3.download_file(AWS_BUCKET, key_to_download, destino_local_path)
+                            break # Arquivo encontrado e baixado, vamos para a próxima lacuna
+
+            except Exception as e:
+                logging.exception(f"Erro ao processar Banda {band_num:02d} na verificação de 24h: {e}")
+                
+    except Exception as e:
+        logging.exception(f"Erro fatal na função de verificação e preenchimento de lacunas: {e}")
 if __name__ == "__main__":
+    # Garante que o multiprocessing funcione corretamente em ambientes como Windows
+    mp.freeze_support() 
     while True:
-        logging.info("Iniciando nova varredura de arquivos...")
+        # ETAPA 1: VERIFICAÇÃO E DOWNLOAD DE DADOS FALTANTES DA AWS
+        verificar_e_preencher_lacunas_aws()
+
+        # ETAPA 2: PROCESSAMENTO DOS ARQUIVOS LOCAIS (SEU CÓDIGO ORIGINAL)
+        logging.info("Iniciando nova varredura de arquivos locais para processamento...")
         try:
             args_list = []
             for band_folder in sorted(os.listdir(INCOMING_DIR)):
                 band_path = os.path.join(INCOMING_DIR, band_folder)
                 if not os.path.isdir(band_path): continue
+                
                 m = re.match(r'Band\s*0*([1-9]\d?)', band_folder, re.IGNORECASE)
                 if not m: continue
+                
                 band_num = int(m.group(1))
-                if band_num not in colormaps: continue
+                # Pequena correção: verifica se a banda está no intervalo de 1 a 16
+                if band_num not in range(1, 17): continue
+
                 for nc_path in sorted(glob.glob(os.path.join(band_path, '*.nc'))):
                     args_list.append((band_num, band_folder, nc_path))
+
             if args_list:
-                with mp.Pool(processes=12) as pool:
+                logging.info(f"Encontrados {len(args_list)} arquivos para processar.")
+                # Usa um número razoável de processos
+                num_processes = min(mp.cpu_count(), 12)
+                with mp.Pool(processes=num_processes) as pool:
                     pool.starmap(process_nc_file, args_list)
-        except Exception:
-            logging.exception("Fatal error in main loop")
+            else:
+                logging.info("Nenhum arquivo novo para processar.")
+
+        except Exception as e:
+            logging.exception(f"Erro fatal no loop de processamento de arquivos: {e}")
+
+        # ETAPA 3: SINCRONIZAÇÃO E LIMPEZA (SEU CÓDIGO ORIGINAL)
         try:
             import subprocess
             powershell_script = r"C:\scripts\sync_goes_to_nas.ps1"
@@ -457,18 +591,23 @@ if __name__ == "__main__":
                 timeout=60
             )
             logging.info("Sincronização com NAS concluída com sucesso.")
+        except FileNotFoundError:
+             logging.warning(f"Script de sincronização não encontrado em: {powershell_script}")
         except subprocess.TimeoutExpired:
             logging.warning("Sincronização com NAS expirou por timeout.")
         except subprocess.CalledProcessError as e:
             logging.error(f"Falha no PowerShell: código de saída {e.returncode}")
         except Exception as e:
             logging.exception(f"Erro inesperado na sincronização com NAS: {e}")
+
         try:
+            logging.info("Iniciando limpeza de arquivos antigos...")
             limpar_arquivos_antigos(ORGANIZED_DIR, dias_para_manter=7)
             limpar_arquivos_antigos(r"Z:\GOES_Organized", dias_para_manter=178)
         except Exception as e:
             logging.exception(f"Erro durante limpeza de arquivos antigos: {e}")
-       
+        
+        logging.info(f"Varredura concluída. Aguardando {CHECK_INTERVAL} segundos...")
         time.sleep(CHECK_INTERVAL)
 
 

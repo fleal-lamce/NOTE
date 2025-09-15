@@ -6,14 +6,7 @@ import logoLeft from "./assets/assVisual_LAMCE_COR_SemTextoTransparente.png";
 import logoRight from "./assets/BaiaDigital-03.png";
 import "./App.css";
 
-function getApiBaseUrl() {
-  const hostname = window.location.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:5001";
-  }
-  return `http://${hostname}:5001`;
-}
-
+// O endereço do seu backend fica fixo aqui
 const API_BASE_URL = "http://192.168.248.147:5001";
 
 const BAND_NAMES = {
@@ -30,49 +23,67 @@ function App() {
     const [frames, setFrames] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [allBands, setAllBands] = useState([]);
-    // --- SOLUÇÃO 1: Adicionar um estado de carregamento ---
     const [isLoading, setIsLoading] = useState(true);
     const intervalRef = useRef(null);
 
+    // --- LÓGICA DE ATUALIZAÇÃO AUTOMÁTICA ---
+
+    // 1. A busca de dados foi movida para uma função reutilizável
+    const fetchImages = () => {
+        // Mostra o "Carregando..." apenas na primeira vez
+        if (frames.length === 0) {
+            setIsLoading(true);
+        }
+
+        axios.get(`${API_BASE_URL}/images`, {
+            params: { region, hours: 24 }
+        })
+        .then(res => {
+            setFrames(res.data);
+        })
+        .catch(err => {
+            console.error("Erro ao buscar dados da API:", err);
+            // Evita múltiplos alertas em caso de falha contínua
+            if (frames.length === 0) {
+                alert("Não foi possível carregar os dados do servidor. Verifique o console (F12).");
+            }
+        })
+        .finally(() => {
+            setIsLoading(false);
+        });
+    };
+    
+    // Este useEffect busca a lista de bandas apenas uma vez
     useEffect(() => {
         axios.get(`${API_BASE_URL}/bands`).then(res => {
             setAllBands(res.data);
         }).catch(err => console.error("Erro ao buscar lista de bandas:", err));
     }, []);
 
+    // 2. Este useEffect agora controla a busca inicial E o timer de atualização
     useEffect(() => {
-        // --- SOLUÇÃO 2: Controlar o estado de carregamento durante a busca ---
-        setIsLoading(true); // Inicia o carregamento
-        setFrames([]);      // Limpa dados antigos
-        setCurrentIndex(0);
+        fetchImages(); // Busca as imagens imediatamente ao carregar ou mudar de região
 
-        axios.get(`${API_BASE_URL}/images`, {
-            params: { region, hours: 24 }
-        })
-        .then(res => {
-            setFrames(res.data); // Define os novos dados
-        })
-        .catch(err => {
-            console.error("Erro ao buscar dados da API:", err);
-            alert("Não foi possível carregar os dados do servidor. Verifique o console (F12).");
-        })
-        .finally(() => {
-            setIsLoading(false); // Finaliza o carregamento, com sucesso ou erro
-        });
-    }, [region]);
+        // Configura um timer para buscar os dados a cada 10 minutos (600000 ms)
+        const intervalId = setInterval(fetchImages, 600000);
 
+        // 3. Limpa o timer anterior sempre que a região muda, para evitar timers duplicados
+        return () => clearInterval(intervalId);
+
+    }, [region]); // A lógica roda novamente sempre que a 'region' é alterada
+
+    // O useEffect da animação permanece exatamente o mesmo
     useEffect(() => {
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
         }
-        // A animação só deve começar se não estiver carregando E se houver frames
         if (!isLoading && frames.length > 0) {
             intervalRef.current = setInterval(() => {
                 setCurrentIndex(prev => (prev + 1) % frames.length);
             }, 700);
             return () => clearInterval(intervalRef.current);
         }
-    }, [isLoading, frames]); // Depende do estado de carregamento e dos frames
+    }, [isLoading, frames]);
 
     const currentFrame = frames[currentIndex] || {};
     const imagesByBand = currentFrame.images || {};
@@ -98,7 +109,6 @@ function App() {
                 </div>
             )}
             <div className="grid">
-                {/* --- SOLUÇÃO 3: Mostrar um feedback de carregamento ou a grade --- */}
                 {isLoading ? (
                     <p style={{ gridColumn: '1 / -1', textAlign: 'center' }}>Carregando imagens...</p>
                 ) : (

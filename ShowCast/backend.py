@@ -26,8 +26,6 @@ def get_bands():
         sorted_bands = sorted(bands)
     return jsonify(sorted_bands)
 
-# --- FUNÇÃO CORRIGIDA ---
-# Restaurada para usar os.walk, que funciona corretamente com sua estrutura de pastas aninhada.
 @app.route("/images")
 def get_images():
     region = request.args.get("region", "Brasil")
@@ -42,24 +40,26 @@ def get_images():
         if not band_dir.exists():
             continue
 
-        # Usar os.walk para percorrer TODAS as subpastas (incluindo ano/mês/dia)
         for root, _, files in os.walk(band_dir):
-            # A condição original e correta: verifica se o diretório atual termina com a região
             if root.endswith(region):
                 for f in files:
                     if f.lower().endswith(".jpg"):
-                        full_path = Path(root) / f
                         try:
-                            file_mtime = datetime.fromtimestamp(full_path.stat().st_mtime, timezone.utc)
-                        except FileNotFoundError:
+                            # --- NOVA LÓGICA AQUI ---
+                            # 1. Extrai a data e hora do nome do arquivo (ex: "2025-09-15_12-10_...")
+                            timestamp_str = f.split('_')[0] + "_" + f.split('_')[1]
+                            # 2. Converte a string para um objeto datetime ciente do fuso horário UTC
+                            file_time_utc = datetime.strptime(timestamp_str, '%Y-%m-%d_%H-%M').replace(tzinfo=timezone.utc)
+                        except (IndexError, ValueError):
+                            # Se o nome do arquivo não tiver o formato esperado, ignora este arquivo
                             continue
                         
-                        if file_mtime >= cutoff:
-                            name_parts = f.split("_")
-                            if len(name_parts) >= 2:
-                                timestamp = f"{name_parts[0]}_{name_parts[1]}"
-                                rel = full_path.relative_to(BASE_DIR)
-                                frames_map[timestamp][band] = f"/static/{rel.as_posix()}"
+                        # 3. Compara o tempo do arquivo com o limite de 24 horas
+                        if file_time_utc >= cutoff:
+                            full_path = Path(root) / f
+                            timestamp = f"{f.split('_')[0]}_{f.split('_')[1]}"
+                            rel = full_path.relative_to(BASE_DIR)
+                            frames_map[timestamp][band] = f"/static/{rel.as_posix()}"
 
     result = []
     for ts in sorted(frames_map):
@@ -76,7 +76,7 @@ def serve_static(filename):
     try:
         resolved_path = full_path.resolve(strict=True)
         if not resolved_path.is_relative_to(BASE_DIR.resolve(strict=True)):
-             return "Acesso negado.", 403
+                return "Acesso negado.", 403
     except FileNotFoundError:
         return f"Arquivo não encontrado: {full_path}", 404
     return send_file(resolved_path, mimetype='image/jpeg')
