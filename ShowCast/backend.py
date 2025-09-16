@@ -13,7 +13,7 @@ app = Flask(__name__, static_folder=None)
 
 CORS(app, origins=[
     "http://localhost:5173",
-    "http://192.168.248.147:5173" # Adicione aqui outros IPs/domínios se necessário
+    "http://192.168.248.147:5173"
 ])
 
 @app.route("/bands", methods=["GET"])
@@ -28,6 +28,7 @@ def get_bands():
 
 @app.route("/images")
 def get_images():
+    """Retorna o frame mais recente de cada banda para a visão geral animada."""
     region = request.args.get("region", "Brasil")
     hours = int(request.args.get("hours", "24"))
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -45,16 +46,11 @@ def get_images():
                 for f in files:
                     if f.lower().endswith(".jpg"):
                         try:
-                            # --- NOVA LÓGICA AQUI ---
-                            # 1. Extrai a data e hora do nome do arquivo (ex: "2025-09-15_12-10_...")
                             timestamp_str = f.split('_')[0] + "_" + f.split('_')[1]
-                            # 2. Converte a string para um objeto datetime ciente do fuso horário UTC
                             file_time_utc = datetime.strptime(timestamp_str, '%Y-%m-%d_%H-%M').replace(tzinfo=timezone.utc)
                         except (IndexError, ValueError):
-                            # Se o nome do arquivo não tiver o formato esperado, ignora este arquivo
                             continue
                         
-                        # 3. Compara o tempo do arquivo com o limite de 24 horas
                         if file_time_utc >= cutoff:
                             full_path = Path(root) / f
                             timestamp = f"{f.split('_')[0]}_{f.split('_')[1]}"
@@ -70,6 +66,42 @@ def get_images():
 
     return jsonify(result)
 
+# --- NOVA ROTA PARA A VISÃO DETALHADA ---
+@app.route("/band/<string:band_name>/images")
+def get_images_for_band(band_name):
+    """Retorna TODAS as imagens de uma banda específica nas últimas 24h."""
+    region = request.args.get("region", "Brasil")
+    hours = int(request.args.get("hours", "24"))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    band_dir = BASE_DIR / band_name
+    if not band_dir.exists():
+        return jsonify({"error": "Band not found"}), 404
+
+    images_list = []
+    for root, _, files in os.walk(band_dir):
+        if root.endswith(region):
+            for f in files:
+                if f.lower().endswith(".jpg"):
+                    try:
+                        timestamp_str = f.split('_')[0] + "_" + f.split('_')[1]
+                        file_time_utc = datetime.strptime(timestamp_str, '%Y-%m-%d_%H-%M').replace(tzinfo=timezone.utc)
+                    except (IndexError, ValueError):
+                        continue
+                    
+                    if file_time_utc >= cutoff:
+                        full_path = Path(root) / f
+                        rel = full_path.relative_to(BASE_DIR)
+                        images_list.append({
+                            "timestamp": timestamp_str,
+                            "url": f"/static/{rel.as_posix()}"
+                        })
+
+    # Ordena as imagens da mais antiga para a mais recente
+    sorted_images = sorted(images_list, key=lambda k: k['timestamp'])
+    return jsonify(sorted_images)
+
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     full_path = BASE_DIR.joinpath(filename)
@@ -80,7 +112,6 @@ def serve_static(filename):
     except FileNotFoundError:
         return f"Arquivo não encontrado: {full_path}", 404
     return send_file(resolved_path, mimetype='image/jpeg')
-
 
 app.config["JSON_SORT_KEYS"] = False
 app.config["JSON_AS_ASCII"] = False

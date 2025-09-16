@@ -6,7 +6,6 @@ import logoLeft from "./assets/assVisual_LAMCE_COR_SemTextoTransparente.png";
 import logoRight from "./assets/BaiaDigital-03.png";
 import "./App.css";
 
-// O endereço do seu backend fica fixo aqui
 const API_BASE_URL = "http://192.168.248.147:5001";
 
 const BAND_NAMES = {
@@ -20,74 +19,20 @@ const BAND_NAMES = {
 
 function App() {
     const [region, setRegion] = useState("Sudeste");
-    const [frames, setFrames] = useState([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [allBands, setAllBands] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const intervalRef = useRef(null);
-
-    // --- LÓGICA DE ATUALIZAÇÃO AUTOMÁTICA ---
-
-    // 1. A busca de dados foi movida para uma função reutilizável
-    const fetchImages = () => {
-        // Mostra o "Carregando..." apenas na primeira vez
-        if (frames.length === 0) {
-            setIsLoading(true);
-        }
-
-        axios.get(`${API_BASE_URL}/images`, {
-            params: { region, hours: 24 }
-        })
-        .then(res => {
-            setFrames(res.data);
-        })
-        .catch(err => {
-            console.error("Erro ao buscar dados da API:", err);
-            // Evita múltiplos alertas em caso de falha contínua
-            if (frames.length === 0) {
-                alert("Não foi possível carregar os dados do servidor. Verifique o console (F12).");
-            }
-        })
-        .finally(() => {
-            setIsLoading(false);
-        });
-    };
     
-    // Este useEffect busca a lista de bandas apenas uma vez
+    const [selectedBand, setSelectedBand] = useState(null);
+    const [lightboxImage, setLightboxImage] = useState(null);
+
     useEffect(() => {
         axios.get(`${API_BASE_URL}/bands`).then(res => {
             setAllBands(res.data);
         }).catch(err => console.error("Erro ao buscar lista de bandas:", err));
     }, []);
 
-    // 2. Este useEffect agora controla a busca inicial E o timer de atualização
-    useEffect(() => {
-        fetchImages(); // Busca as imagens imediatamente ao carregar ou mudar de região
-
-        // Configura um timer para buscar os dados a cada 10 minutos (600000 ms)
-        const intervalId = setInterval(fetchImages, 600000);
-
-        // 3. Limpa o timer anterior sempre que a região muda, para evitar timers duplicados
-        return () => clearInterval(intervalId);
-
-    }, [region]); // A lógica roda novamente sempre que a 'region' é alterada
-
-    // O useEffect da animação permanece exatamente o mesmo
-    useEffect(() => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-        }
-        if (!isLoading && frames.length > 0) {
-            intervalRef.current = setInterval(() => {
-                setCurrentIndex(prev => (prev + 1) % frames.length);
-            }, 700);
-            return () => clearInterval(intervalRef.current);
-        }
-    }, [isLoading, frames]);
-
-    const currentFrame = frames[currentIndex] || {};
-    const imagesByBand = currentFrame.images || {};
-    const timestamp = currentFrame.timestamp || "";
+    const handleBackToMain = () => {
+        setSelectedBand(null);
+    };
 
     return (
         <div className="container">
@@ -103,21 +48,74 @@ function App() {
                     <option value="Sudeste">Sudeste</option>
                 </select>
             </div>
+
+            {!selectedBand ? (
+                <MainGridView allBands={allBands} region={region} onBandClick={setSelectedBand} />
+            ) : (
+                <BandDetailView 
+                    bandName={selectedBand} 
+                    region={region} 
+                    onImageClick={setLightboxImage}
+                    onBack={handleBackToMain}
+                />
+            )}
+
+            {lightboxImage && (
+                <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
+            )}
+        </div>
+    );
+}
+
+function MainGridView({ allBands, region, onBandClick }) {
+    const [frames, setFrames] = useState([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const animationIntervalRef = useRef(null);
+
+    useEffect(() => {
+        const fetchMainImages = () => {
+            setIsLoading(true);
+            axios.get(`${API_BASE_URL}/images`, { params: { region, hours: 24 } })
+                .then(res => setFrames(res.data))
+                .catch(err => console.error("Erro ao buscar imagens principais:", err))
+                .finally(() => setIsLoading(false));
+        };
+        fetchMainImages();
+        const intervalId = setInterval(fetchMainImages, 600000);
+        return () => clearInterval(intervalId);
+    }, [region]);
+
+    useEffect(() => {
+        clearInterval(animationIntervalRef.current);
+        if (!isLoading && frames.length > 0) {
+            animationIntervalRef.current = setInterval(() => {
+                setCurrentIndex(prev => (prev + 1) % frames.length);
+            }, 700);
+        }
+        return () => clearInterval(animationIntervalRef.current);
+    }, [isLoading, frames]);
+
+    const currentFrame = frames[currentIndex] || {};
+    const imagesByBand = currentFrame.images || {};
+    const timestamp = currentFrame.timestamp || "";
+
+    return (
+        <>
             {timestamp && !isLoading && (
-                <div style={{ textAlign: "center", marginTop: "8px", marginBottom: "4px", fontSize: "1rem", color: "#ccc", fontWeight: "500" }}>
+                <div className="timestamp-display">
                     Exibindo dados de: {formatTimestamp(timestamp)}
                 </div>
             )}
             <div className="grid">
                 {isLoading ? (
-                    <p style={{ gridColumn: '1 / -1', textAlign: 'center' }}>Carregando imagens...</p>
+                    <p className="loading-text">Carregando imagens...</p>
                 ) : (
                     allBands.map((band) => {
-                        const productName = BAND_NAMES[band] || band;
                         const url = imagesByBand[band];
                         return (
-                            <div key={band} className="card">
-                                <div className="card-title">{productName}</div>
+                            <div key={band} className="card" onClick={() => onBandClick(band)}>
+                                <div className="card-title">{BAND_NAMES[band] || band}</div>
                                 {url ? (
                                     <img src={`${API_BASE_URL}${url}`} alt={band} className="band-image" />
                                 ) : (
@@ -128,16 +126,65 @@ function App() {
                     })
                 )}
             </div>
+        </>
+    );
+}
+
+function BandDetailView({ bandName, region, onImageClick, onBack }) {
+    const [bandImages, setBandImages] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        axios.get(`${API_BASE_URL}/band/${bandName}/images`, { params: { region, hours: 24 } })
+            .then(res => setBandImages(res.data))
+            .catch(err => console.error(`Erro ao buscar imagens para a banda ${bandName}:`, err))
+            .finally(() => setIsLoading(false));
+    }, [bandName, region]);
+
+    return (
+        <>
+            <div className="detail-header">
+                <button onClick={onBack} className="back-button">← Voltar</button>
+                <h2 className="detail-title">{BAND_NAMES[bandName] || bandName} - Últimas 24h</h2>
+            </div>
+            <div className="grid static-grid">
+                {isLoading ? (
+                    <p className="loading-text">Carregando imagens da banda...</p>
+                ) : bandImages.length > 0 ? (
+                    bandImages.map(({ timestamp, url }) => (
+                        <div key={url} className="card" onClick={() => onImageClick(`${API_BASE_URL}${url}`)}>
+                            <div className="card-title">{formatTimestamp(timestamp)}</div>
+                            <img src={`${API_BASE_URL}${url}`} alt={timestamp} className="band-image" />
+                        </div>
+                    ))
+                ) : (
+                    <p className="loading-text">Nenhuma imagem encontrada para esta banda nas últimas 24 horas.</p>
+                )}
+            </div>
+        </>
+    );
+}
+
+// --- COMPONENTE LIGHTBOX CORRIGIDO ---
+function Lightbox({ imageUrl, onClose }) {
+    return (
+        <div className="lightbox-overlay" onClick={onClose}>
+            {/* O botão agora é irmão do conteúdo, não filho, para facilitar o posicionamento */}
+            <button onClick={onClose} className="lightbox-close-button">×</button>
+            <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+                <img src={imageUrl} alt="Imagem em tela cheia" className="lightbox-image" />
+            </div>
         </div>
     );
 }
 
 function formatTimestamp(ts) {
     if (!ts) return "";
-    const match = ts.match(/(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})/);
-    if (!match) return ts;
-    const [_, year, month, day, hour, minute] = match;
-    return `${day}/${month}/${year} às ${hour}:${minute} UTC`;
+    const [date, time] = ts.split('_');
+    const [year, month, day] = date.split('-');
+    const [hour, minute] = time.split('-');
+    return `${day}/${month}/${year} ${hour}:${minute} UTC`;
 }
 
 export default App;
