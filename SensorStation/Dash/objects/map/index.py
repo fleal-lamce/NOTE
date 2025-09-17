@@ -16,11 +16,9 @@ class GeoMap:
     center = {"lat": -22.8610, "lon": -43.2230} 
 
     def __init__(self, dashboard):
-        self.locations = pd.read_sql_query('SELECT * FROM Locations_location', sqlite3.connect('../Server/db.sqlite3')).rename(columns={"lng": "lon"})
-        self.locations = [row.to_dict() for i, row in self.locations.iterrows()]
-        print(self.locations)
-
         self.dashboard = dashboard
+        self.locations = [row.to_dict() for i, row in self.dashboard.analysis.locations.iterrows()]
+  
         self.df = pd.DataFrame(self.locations)
         self.df['hover_html'] = self.df.label.map(getPDF)
 

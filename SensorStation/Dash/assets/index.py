@@ -43,10 +43,9 @@ class Interface:
     def graph(self):
         return html.Div(className='graph-container', children=[
             html.Div(className='graph-title', children=[
-                html.Div(style={'width': '60%', 'color': 'black', 'height': '1.5rem'}, children=[
-                    self.input('Variável:', self.dashboard.analysis.variables, 'var-select'),
-                ])
-            ]),
+                html.Div('Último Valor: 90% | Faixa: 40.0 - 89%', className='graph-bottom', id='graph-last-val'),
+                html.Div('Atualizado em dd/mm/yy - 13:12:11', id='graph-date', className='graph-title-right')
+            ]), 
             
             html.Div(className='line-graph', children=[
                 dcc.Graph(
@@ -55,11 +54,12 @@ class Interface:
                     style={'width': '100%', 'height': '100%'}
                 )
             ]),
-
+            
             html.Div(className='graph-title', children=[
-                html.Div('Último Valor: 90% | Faixa: 40.0 - 89%', className='graph-bottom', id='graph-last-val'),
-                html.Div('Atualizado em dd/mm/yy - 13:12:11', id='graph-date', className='graph-title-right')
-            ]),         
+                html.Div(style={'width': '60%', 'color': 'black', 'height': '1.5rem'}, children=[
+                    self.input('Variável:', self.dashboard.analysis.variables, 'var-select'),
+                ])
+            ])
         ])
     
     def table(self):

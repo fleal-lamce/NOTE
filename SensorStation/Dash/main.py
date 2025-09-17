@@ -1,5 +1,4 @@
-import pandas as pd
-from dash import Dash, html, Input, Output, State
+from dash import Dash, html, Input, Output, State, dcc
 from assets.index import Interface
 from objects.analysis.index import Analysis
 from objects.events.index import Events
@@ -25,7 +24,9 @@ class Dashboard:
         self.callbaks()
 
     def start(self):
-        self.app.layout = html.Div(className="Page", children=self.interface.render())
+        interval = dcc.Interval(id="interval-component", interval=60*1000, n_intervals=0)
+        self.app.layout = html.Div(className="Page", children=[interval, self.interface.render()])
+
         self.app.run(host='0.0.0.0', port=8050, debug=False)
 
     def callbaks(self):
@@ -46,12 +47,14 @@ class Dashboard:
             Input('var-select', 'value'),
             Input('area-select', 'value'),
             Input('device-select', 'value'),
+            Input('interval-component', 'n_intervals'), 
         ]
 
         @self.app.callback(outputs, inputs)
-        def render(btn1, varkey, area, device):
+        def render(btn1, varkey, area, device, interval):
             if self.events.clicked('update-button'):
                 self.analysis.download()
+
 
             self.analysis.device = device
             self.analysis.area   = area
@@ -83,6 +86,7 @@ class Dashboard:
         def downloadTable(n_clicks):
             return self.table.download()
 
+        
 
 if __name__ == '__main__':
     dashboard = Dashboard()

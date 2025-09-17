@@ -14,8 +14,9 @@ class Analysis:
         self.areas   = []
         self.device = 'all'
         self.area   = 'all'
-        self.ALL_AREAS   = pd.read_sql_query('SELECT * FROM Areas_area', sqlite3.connect('../Server/db.sqlite3'))
-        self.ALL_DEVICES = pd.read_sql_query('SELECT * FROM Devices_device', sqlite3.connect('../Server/db.sqlite3'))
+        self.AREAS   = pd.read_sql_query('SELECT * FROM Areas_area', sqlite3.connect('../Server/db.sqlite3'))
+        self.DEVICES = pd.read_sql_query('SELECT * FROM Devices_device', sqlite3.connect('../Server/db.sqlite3'))
+        self.locations = pd.read_sql_query('SELECT * FROM Locations_location', sqlite3.connect('../Server/db.sqlite3')).rename(columns={"lng": "lon"})
 
     def download(self):
         LIMIT = 15000
@@ -31,13 +32,13 @@ class Analysis:
 
         self.database.rename(columns={'timestamp': 'time'}, inplace=True)
         self.devices = [{'label': 'todos', 'value': 'all'}] + [{'label': self.getID(id), 'value': id} for id in self.database.esp_id.unique()]
-        self.areas   = [{'label': 'todos', 'value': 'all'}] + [{'label': self.getArea(area), 'value': area} for area in self.ALL_AREAS.value.unique()]
+        self.areas   = [{'label': 'todos', 'value': 'all'}] + [{'label': self.getArea(area), 'value': area} for area in self.AREAS.value.unique()]
 
     def update(self):
         self.df = self.database.copy()
 
         if self.area != 'all':
-            target  = self.ALL_DEVICES.loc[self.ALL_DEVICES.area == self.area]
+            target  = self.DEVICES.loc[self.DEVICES.area == self.area]
             self.df = self.df.loc[self.df.esp_id.isin(target.esp_id.values)]
 
         if self.device != 'all':
@@ -66,21 +67,21 @@ class Analysis:
         return s.iloc[-1] if not s.empty else errors
 
     def getID(self, id):
-        target_devices = self.ALL_DEVICES.loc[self.ALL_DEVICES.esp_id == id]
+        target_devices = self.DEVICES.loc[self.DEVICES.esp_id == id]
         
         if len(target_devices) == 0:
             return None
 
         node   = target_devices.iloc[0].node
         area   = target_devices.iloc[0].area
-        target = self.ALL_AREAS.loc[self.ALL_AREAS.value == area]
+        target = self.AREAS.loc[self.AREAS.value == area]
         
-        if len(target) == 0:
-            return None
+        label = target.iloc[0].label if (len(target) == 0) else None
         
-        label = target.iloc[0].label
+        target = self.locations.loc[self.locations.value == node]
+        node   = node if len(target) == 0 else target.iloc[0].label 
         return f'{id} - {label} - {node}'
     
     def getArea(self, area):
-        target = self.ALL_AREAS.loc[self.ALL_AREAS.value == area]
+        target = self.AREAS.loc[self.AREAS.value == area]
         return target.iloc[0].label if len(target) > 0 else 'NULL'
