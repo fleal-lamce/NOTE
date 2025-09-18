@@ -53,7 +53,7 @@ class LineGraph:
         fig.add_trace(go.Scatter(
             x=x, y=y, mode="lines",
             line=dict(width=3, color=color),
-            name='value'
+            name='value',
         ))
 
         fig.update_layout(
@@ -71,7 +71,11 @@ class LineGraph:
                 x=0.98,            # perto da direita
                 bgcolor="rgba(0,0,0,0)",
                 font=dict(size=11, color="#e5e7eb")
-            )
+            ),
+            hoverlabel=dict(
+                font_color="black",   # Texto branco
+                font_size=12,         # Tamanho da fonte
+            ),
         )
 
         self.fig  = fig

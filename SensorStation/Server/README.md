@@ -86,6 +86,7 @@ python manage.py migrate
 ```python
 python manage.py runserver (local)
 python manage.py runserver 0.0.0.0:8000 (global)
+python manage.py runserver 0.0.0.0:8000 --nothreading --noreload (produção)
 ```
 obs: (para encontrar o endereço vá em ipconfig ipv4)
 

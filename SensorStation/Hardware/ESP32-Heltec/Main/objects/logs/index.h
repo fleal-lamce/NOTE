@@ -2,12 +2,12 @@
 #define SERVER_LOGS_H
 #include "../dataset/index.h"
 #include "../../utils/notes/index.h"
-#include "../wireless/heltec/index.h"
+//#include "../wireless/heltec/index.h"
 
 
 template <typename Parent> class Logs{
   private:
-    HeltecLora heltec;
+    //HeltecLora heltec;
     Notes notes = Notes("/txt");
     Parent* device;
     
@@ -17,7 +17,7 @@ template <typename Parent> class Logs{
 
     void setup(){
         Serial.println("Setting Up Notes");
-        heltec.setup();
+        //heltec.setup();
         delay(2000);
         notes.setup();
     }
@@ -41,7 +41,7 @@ template <typename Parent> class Logs{
         if(!device->sensors.available)
             return;
         
-        heltec.send(dataset.info); 
+        //heltec.send(dataset.info); 
         device->sensors.available = false;
         Serial.println("(log) sent: " + dataset.toString());
     }
@@ -52,8 +52,8 @@ template <typename Parent> class Logs{
         if(!listener.ready())
             return;
 
-        if(!heltec.get(dataset.info))
-            return;
+        //if(!heltec.get(dataset.info))
+        //    return;
         
         store();
     }

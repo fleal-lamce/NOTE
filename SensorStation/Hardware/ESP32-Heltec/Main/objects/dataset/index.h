@@ -6,7 +6,6 @@
 
 struct __attribute__((packed)) DeviceData{
     char id[12];
-    uint8_t area = 1;
     int16_t temperature;
     uint8_t humidity; 
     int16_t velocity; 
@@ -35,7 +34,6 @@ class Dataset{
         variables["rain"]        = info.rain;
         
         log["esp_id"] = info.id;
-        log["area"]   = info.area;
         log["data"]   = variables;
 
         request["table"] = "logs";

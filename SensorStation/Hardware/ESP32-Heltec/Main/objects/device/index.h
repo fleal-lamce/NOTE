@@ -14,7 +14,7 @@
 
 class Device{
   public:
-    const byte mode = MASTER_MODE;
+    const byte mode = MISTER_MODE;
     unsigned long startTime;
     Settings settings;
     Text<12> id;
@@ -32,7 +32,7 @@ class Device{
 
     void setup(){
         snprintf(id.buffer, sizeof(id.buffer), "%04X%08X", (uint16_t)(ESP.getEfuseMac() >> 32), (uint32_t)ESP.getEfuseMac());
-        Serial.print("Device Started: "); Serial.print(id.get());
+        Serial.print("\n\nDevice Started: "); Serial.println(id.get());
         settings.import();
         logs.setup();
         
