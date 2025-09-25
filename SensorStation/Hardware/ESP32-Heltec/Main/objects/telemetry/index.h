@@ -24,8 +24,8 @@ template <typename Parent> class Telemetry{
         multiplexer(dev){}
 
     void setup(){
-        if(device->mode == SLAVE_MODE)
-            multiplexer.setup();
+        //if(device->mode == SLAVE_MODE)
+        //    multiplexer.setup();
          
         response.reset(); 
     }

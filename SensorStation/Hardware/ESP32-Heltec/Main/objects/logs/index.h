@@ -33,9 +33,9 @@ template <typename Parent> class Logs{
     }
 
     void handleSender(){
-        static Listener listener = Listener(5000);
+        static Listener timer = Listener(5000);
         
-        if(!listener.ready())
+        if(!timer.ready())
             return;
 
         if(!device->sensors.available)
@@ -47,9 +47,9 @@ template <typename Parent> class Logs{
     }
 
     void handleStore(){
-        static Listener listener = Listener(7000);
+        static Listener timer = Listener(7000);
         
-        if(!listener.ready())
+        if(!timer.ready())
             return;
 
         //if(!heltec.get(dataset.info))
@@ -59,9 +59,9 @@ template <typename Parent> class Logs{
     }
 
     void handleServer(){
-        static Listener listener = Listener(30000);
+        static Listener timer = Listener(30000);
         
-        if(!listener.ready())
+        if(!timer.ready())
             return;
 
         if(!device->server.active)

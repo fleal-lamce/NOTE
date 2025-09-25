@@ -1,6 +1,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
-#include "../../../utils/json/index.h"
+#include "../../utils/json/index.h"
 
 
 class Settings{
@@ -21,6 +21,12 @@ class Settings{
 
     template<typename T> T get(const char* key) const {
         return params.template get<T>(key);
+    }
+
+    const char* getID(){
+        static char buffer[20];
+        snprintf(buffer, sizeof(buffer), "%04X%08X", (uint16_t)(ESP.getEfuseMac() >> 32), (uint32_t)ESP.getEfuseMac());
+        return buffer;
     }
 
     void save(){
