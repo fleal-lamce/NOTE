@@ -609,6 +609,3 @@ if __name__ == "__main__":
         
         logging.info(f"Varredura concluída. Aguardando {CHECK_INTERVAL} segundos...")
         time.sleep(CHECK_INTERVAL)
-
-
-
