@@ -23,17 +23,17 @@ template <typename Parent> class Logs{
     }
 
     void handle(){
-        if(device->mode == SLAVE_MODE  || device->mode == MISTER_MODE)
+        if(device->sending)
             handleSender();
         
-        if(device->mode == MASTER_MODE || device->mode == MISTER_MODE){
-            handleStore();
+        if(device->serving)
             handleServer();
-        }
+
+        handleStore();
     }
 
     void handleSender(){
-        static Listener timer = Listener(5000);
+        static Listener timer = Listener(1*60*1000);
         
         if(!timer.ready())
             return;
@@ -46,20 +46,8 @@ template <typename Parent> class Logs{
         Serial.println("(log) sent: " + dataset.toString());
     }
 
-    void handleStore(){
-        static Listener timer = Listener(7000);
-        
-        if(!timer.ready())
-            return;
-
-        //if(!heltec.get(dataset.info))
-        //    return;
-        
-        store();
-    }
-
     void handleServer(){
-        static Listener timer = Listener(30000);
+        static Listener timer = Listener(30*1000);
         
         if(!timer.ready())
             return;
@@ -67,27 +55,9 @@ template <typename Parent> class Logs{
         if(!device->server.active)
             return;
         
-        send();
-    }
-
-    void store(){
-        const int size = notes.length();
-        String log     = dataset.toString();
-
-        Serial.println("(log) stored: " + log);
-        Serial.println("(log) notes size: " + String(size));
-        Serial.println();
-        
-        if(size > 15000)
-            notes.droplines(5);
-
-        notes.append(log);
-    }
-
-    void send(){
         while(notes.length() > 10){ 
             String log    = notes.readlines(1);
-            String result = device->server.post("add/", log);
+            String result = device->server.post("api/add_log/", log);
             Serial.println("(server) log:      " + log);
             Serial.println("(server) response: " + result);
             Serial.println();
@@ -98,6 +68,35 @@ template <typename Parent> class Logs{
             notes.droplines(1);
             delay(200);
         }
+    }
+
+    void handleStore(){
+        static Listener timer = Listener(5*1000);
+
+        if(!timer.ready())
+            return;
+
+        if(device->mode == SLAVE_MODE)
+            return;
+
+        //if(device->mode == MASTER_MODE && !heltec.get(dataset.info))
+        //    return;
+
+        if(device->mode == MISTER_MODE && !device->sensors.available)
+            return;
+
+        const int size = notes.length();
+        String log     = dataset.toString();
+
+        Serial.println("(log) stored:     " + log);
+        Serial.println("(log) notes size: " + String(size));
+        Serial.println();
+        
+        if(size > 15000)
+            notes.droplines(5);
+
+        notes.append(log);
+        device->sensors.available = false;
     }
 };
 

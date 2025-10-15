@@ -1,5 +1,5 @@
 #ifndef PROTOCOL_H
-#define PROTOCOL_H
+#define PROTOCOL_h
 #include <Arduino.h>
 
 
@@ -9,41 +9,28 @@ template <typename Parent> class Protocol{
 
     Protocol(Parent* dev):
         device(dev){}
-    
-    bool handle(){
+
+    void check(){
         device->telemetry.serial.clean();
-        device->telemetry.serial.print();
 
-        if(device->telemetry.serial.command.length() > 100)
-            return false;
+        if(device->telemetry.serial.command.contains("D:"))
+            return handleID();
 
-        if(device->telemetry.serial.command.contains("D:")){
-            handleID();
-            return true;
-        }
+        if(device->telemetry.serial.command.contains("F:"))
+            return handleConfig();
+        
+        if(device->telemetry.serial.command.contains("$MICRS!"))
+            return device->reset();
 
-        if(device->telemetry.serial.command.contains("F:")){
-            handleConfig();
-            return true;
-        }
-
-        if(device->telemetry.serial.command.contains("$MICRS!")){
-            device->reset();
-            return true;
-        }
-
-        if(device->telemetry.serial.command.contains("settings")){
-            device->telemetry.serial.send(device->settings.params.toString());
-            return true;
-        }
-
-        if(device->telemetry.serial.command.contains("$ERASE!")){
+        if(device->telemetry.serial.command.contains("$erase!")){
             device->settings.erase(); 
-            device->reset();
+            return device->reset();
         }
 
-        device->telemetry.serial.reset();
-        return false;
+        if(device->telemetry.serial.command.contains("$CHECK!")){
+            device->telemetry.response.set("OK");
+            return;
+        }
     }
 
     void handleID(){
@@ -51,13 +38,13 @@ template <typename Parent> class Protocol{
         const int end   = device->telemetry.serial.command.find('$');
 
         if(start == -1 || end == -1)
-            {device->telemetry.response.set("ERROR"); return;}
+            return device->telemetry.response.set("ERROR");
         
         auto key   = device->telemetry.serial.command.substring(start+1, end);
-        auto value = device->settings.template get<const char*>(key.get());
-
+        auto value = device->settings.template get<String>(key.get());
+        
         if(value == nullptr)
-            {device->telemetry.response.set("ERROR"); return;}
+            return device->telemetry.response.set("ERROR");
 
         device->telemetry.response.reset();
         device->telemetry.response += '$';
@@ -71,16 +58,15 @@ template <typename Parent> class Protocol{
         const int end   = device->telemetry.serial.command.find('!');
 
         if(start == -1 || mid == -1 || end == -1)
-            {device->telemetry.response.set("NONE"); return;}
+            return device->telemetry.response.set("NONE");
 
         auto key   = device->telemetry.serial.command.substring(start+1, mid);
         auto value = device->telemetry.serial.command.substring(mid+1, end);
 
         device->settings.params.set(key.get(), value.get());
-        device->settings.save();
         device->telemetry.response.set("OK");
+        device->settings.save();
     }
 };
-
 
 #endif

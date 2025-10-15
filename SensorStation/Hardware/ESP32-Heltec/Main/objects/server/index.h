@@ -30,6 +30,7 @@ template <typename Parent> class EspServer{
 
     void handle(){
         static Listener listener = Listener(50);
+        check();
 
         if(!listener.ready())
             return;
@@ -54,13 +55,10 @@ template <typename Parent> class EspServer{
         if(!timer.ready())
             return;
         
-        Serial.println("vou checar");
-        Text<64> response = get("check/", 12000);
-        Serial.println(response.toString());
-        
+        Text<64> response = get("api/check/", 12000);
         active = response.contains("success");
         Serial.println("server status: " + String(active));
-
+        
         if(!active)
             WiFi.reconnect();
     }
@@ -92,7 +90,7 @@ template <typename Parent> class EspServer{
         if(!connected())
             return "-1";
 
-        String url = URL.toString() + route;
+        const String url = URL.toString() + route;
         HTTPClient http;
 
         http.begin(url);
@@ -100,11 +98,11 @@ template <typename Parent> class EspServer{
         http.setTimeout(timeout);
         
         const int code = http.POST(data);
-        const bool success = (code >= 200 && code < 300);
-        String payload     = success ? http.getString() : "-1";
+        const bool success   = (code >= 200 && code < 300);
+        const String payload = success ? http.getString() : "-1";
 
         if(!success)
-            Serial.println("http error code: " + String(code));
+            Serial.println(url + " | http error code: " + String(code));
 
         http.end();
         return payload;
@@ -114,15 +112,15 @@ template <typename Parent> class EspServer{
         if(!connected())
             return "-1";
         
-        String url = URL.toString() + route;
+        const String url = URL.toString() + route;
         HTTPClient http;
 
         http.begin(url);
         http.setTimeout(timeout);
 
         const int code = http.GET();
-        const bool success = (code >= 200 && code < 300);
-        String payload     = success ? http.getString() : "-1";
+        const bool success   = (code >= 200 && code < 300);
+        const String payload = success ? http.getString() : "-1";
 
         if(!success)
             Serial.println(url + " | http error code: " + String(code));
@@ -131,7 +129,7 @@ template <typename Parent> class EspServer{
         return payload;
     }
 
-    void connect(){
+    void connect(const int timeout=5000){
         const char* ssid = device->settings.template get<const char*>("ssid");
         const char* pass = device->settings.template get<const char*>("pass");
         
@@ -141,7 +139,7 @@ template <typename Parent> class EspServer{
         esp_wifi_set_ps(WIFI_PS_NONE);
         WiFi.begin(ssid, pass);
 
-        while(Time::get() - startTime < 5000){
+        while(Time::get() - startTime < timeout){
             if(!connected()){
                 delay(100);
                 continue;

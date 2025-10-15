@@ -4,6 +4,8 @@ from django.db import connection
 from Utils.functions import sendEvent
 from Tables.Logs.models import Log
 from Tables.Areas.models import Area
+import orjson, json
+from django.http import HttpResponse
 
 
 class API:
@@ -67,8 +69,11 @@ class API:
             sendEvent('error', error)
             return orjson.dumps({'status': 'error', 'data': str(error)})
 
-
         return orjson.dumps({'status': 'success', 'data': 'data inserted'})
+    
+    def send(self, status, message):
+        data = orjson.dumps({'status': status, 'data': message})
+        return HttpResponse(data)
 
 
 api = API()

@@ -2,7 +2,7 @@
 #define TELEMETRY_H
 #include "serial/index.h"
 #include "protocol/index.h"
-#include "multiplexer/index.h"
+#include "modes/QML201C/index.h"
 #define MAX_SIZE 1024 
 
 
@@ -13,38 +13,49 @@ template <typename Parent> class Telemetry{
 
   public:
     NextSerial<MAX_SIZE> serial{debug ? Serial : Serial2};
+    Protocol<Parent> protocol;
     Text<64> response;
 
-    Multiplexer<Parent> multiplexer;
-    Protocol<Parent> protocol;
-
+    QML201C<Parent> qml;
+    byte type;
+    
     Telemetry(Parent* dev):
         device(dev),
         protocol(dev),
-        multiplexer(dev){}
+        qml(dev){}
 
     void setup(){
-        //if(device->mode == SLAVE_MODE)
-        //    multiplexer.setup();
-         
+        type = device->settings.template get<byte>("telemetry");
+        
+        if(type == QML_TEL)
+           qml.setup();
+        
         response.reset(); 
     }
 
     void handle(){
-        serial.listen();
+        listen();
 
-        if(device->mode == SLAVE_MODE)
-            multiplexer.handle();
+        if(type == QML_TEL)
+            qml.handle();
+    }
+    
+    void listen(){
+        serial.listen();
         
-        if(serial.available && protocol.handle())
-            serial.reset();
+        if(type == QML_TEL)
+            qml.check();
+
+        if(serial.available)
+            protocol.check();
         
         if(response.length() > 0)
             event(response.get());
-    }
 
+        serial.reset();
+    }
+    
     void event(const char* value){
-        Serial.println("(telemetry) event: " + String(value));
         serial.send(value, true);
         response.reset();
     }

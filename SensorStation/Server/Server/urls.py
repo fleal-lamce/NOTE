@@ -5,15 +5,14 @@ from rest_framework.decorators import action
 from django.http import HttpResponse
 from Utils.API import api
 import json, orjson
-
-from Routes.Graphs import *
+from Tables.Logs.views import *
 
 
 @csrf_exempt
 @action(detail=False, methods=['get'], url_path='replace')
 def onCheckRequest(request):
     print(request.body)
-    return HttpResponse(orjson.dumps({'status': 'success', 'data': 'OK'}), content_type='application/json')
+    return api.send('success', 'OK')
 
 @csrf_exempt
 @action(detail=False, methods=['post'], url_path='replace')
@@ -21,7 +20,7 @@ def onRowsRequest(request):
     data  = json.loads(request.body)
     table = data.get('table')
     limit = data.get('limit')
-    return HttpResponse(api.get(table, limit), content_type='application/json')
+    return HttpResponse(api.get(table, limit))
 
 @csrf_exempt
 @action(detail=False, methods=['post'], url_path='replace')
@@ -33,11 +32,12 @@ def onAddRequest(request):
     
     table = data.get('table')
     data  = data.get('data')
-    return HttpResponse(api.add(table, data), content_type='application/json')
+    return HttpResponse(api.add(table, data))
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/check/', onCheckRequest),
     path('api/rows/', onRowsRequest),
-    path('api/add/', onAddRequest)
+    path('api/add/', onAddRequest),
+    path('api/add_log/', onAddLogRequest),
 ]
