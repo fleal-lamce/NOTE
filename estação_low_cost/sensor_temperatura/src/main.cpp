@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define LM35_PIN 36  // GPIO36 = ADC1_CH0
+#define LM35_PIN 34  // GPIO36 = ADC1_CH0
 
 void setup() {
   Serial.begin(115200);
