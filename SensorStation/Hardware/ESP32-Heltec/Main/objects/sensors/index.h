@@ -41,11 +41,7 @@ template <typename Parent> class Sensors{
         if(!listener.ready() || device->mode == MASTER_MODE)
             return;
 
-        dataset.info.temperature = sht.temperature.value; 
-        dataset.info.humidity    = sht.humidity.value;  
-        dataset.info.velocity    = windstation.velocity.value;
-        dataset.info.direction   = windstation.direction.value; 
-        dataset.info.rain        = rain.value;
+        dataset.info.values[0] = windstation.velocity.value;
         available = true;
     }
 };

@@ -16,12 +16,15 @@ class Device{
     const byte mode = MISTER_MODE;
     unsigned long startTime;
     Settings settings;
-    Text<12> id;
+    Text<20> id;
 
     Telemetry<Device> telemetry;
     EspServer<Device> server;
     Sensors<Device> sensors;
     Logs<Device> logs;
+
+    bool sending = false;
+    bool serving = false; 
 
     Device():
         telemetry(this),
@@ -30,10 +33,13 @@ class Device{
         server(this){}
 
     void setup(){
-        id.set(settings.getID());
-        Serial.print("\n\nDevice Started: "); Serial.println(id.get());
         settings.import();
-        logs.setup();
+        id.set(settings.template get<const char*>("esp_id"));
+        Serial.print("\n\nDevice Started: "); Serial.println(id.get());
+        settings.params.print();
+        
+        sending = (mode == SLAVE_MODE  || mode == MISTER_MODE);
+        serving = (mode == MASTER_MODE || mode == MISTER_MODE);
         
         if(mode == MASTER_MODE)
             Serial.println("Modo Master Ativo");
@@ -44,27 +50,25 @@ class Device{
         if(mode == MISTER_MODE)
             Serial.println("Modo Misto Ativo");
 
-        if(mode == MASTER_MODE || mode == MISTER_MODE)
+        if(serving)
             server.connect();
         
-        if(mode == SLAVE_MODE || mode == MISTER_MODE)
+        if(sending)
             sensors.setup();
+        
+        telemetry.setup();
+        logs.setup();
     }
 
     void handle(){
-        if(mode == SLAVE_MODE  || mode == MISTER_MODE){
+        if(sending)
             sensors.handle();
-        }
-
-        if(mode == MASTER_MODE || mode == MISTER_MODE){
-            server.handle();
-            server.check();
-        }
         
-        if(mode == SLAVE_MODE){
-            telemetry.handle();
-            logs.handle();
-        }
+        if(serving)
+            server.handle();
+        
+        telemetry.handle();
+        logs.handle();
     }
 
     void reset(){
@@ -76,9 +80,8 @@ class Device{
 inline Device device;
 
 void setup(){
-    Serial.begin(115200);
-    delay(800);
-    setup();
+    Serial.begin(115200); delay(800);
+    device.setup();
 }
 
 void loop(){

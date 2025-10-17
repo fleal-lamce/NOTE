@@ -6,4 +6,7 @@
 #define SLAVE_MODE  1
 #define MISTER_MODE 2
 
+#define NO_TEL  0
+#define QML_TEL 1
+
 #endif

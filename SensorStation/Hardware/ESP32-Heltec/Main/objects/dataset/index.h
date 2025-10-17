@@ -2,20 +2,23 @@
 #define DATASET_H
 #include <Arduino.h>
 #include "../../utils/json/index.h"
+#include "../../utils/text/index.h"
+#define VARS_SIZE 10
 
 
 struct __attribute__((packed)) DeviceData{
     char id[12];
-    int16_t temperature;
-    uint8_t humidity; 
-    int16_t velocity; 
-    int16_t direction; 
-    int16_t rain;
+    float values[VARS_SIZE];
 };
 
 class Dataset{
   public:
     DeviceData info;
+
+    Dataset(){
+        for(int x=0; x<VARS_SIZE; x++)
+            info.values[x] = -1;
+    }
 
     void setID(const char* text){
         strncpy(info.id, text, sizeof(info.id) - 1);
@@ -23,24 +26,16 @@ class Dataset{
     }
 
     String toString(){
-        JsonDocument variables;
-        JsonDocument log;
-        JsonDocument request;
+        Json<256> request;
+        request.set("esp_id", info.id);
 
-        variables["temperature"] = info.temperature;
-        variables["humidity"]    = info.humidity;
-        variables["velocity"]    = info.velocity;
-        variables["direction"]   = info.direction;
-        variables["rain"]        = info.rain;
+        Text<128> data = "[";
+        for(int x=0; x<VARS_SIZE; x++)
+            data += String(info.values[x]) + ",";
         
-        log["esp_id"] = info.id;
-        log["data"]   = variables;
-
-        request["table"] = "logs";
-        request["data"]  = log;
-        
-        String payload; serializeJson(request, payload);
-        return payload;
+        data += "]";
+        request.set("variables", data.buffer);
+        return request.toString();
     }
 };
 

@@ -45,7 +45,7 @@ class WindStation{
                 value   = counter/t * 1000;
                 counter = 0;
                 setStatus();
-                Serial.println(status);
+                //Serial.println(status);
             }
         }
             

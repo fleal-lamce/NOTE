@@ -53,6 +53,9 @@ template<int SIZE> class Text{
     }
 
     void concat(const char* str) {
+        if(str == nullptr)
+            return;
+        
         while(*str && index < limit)
             append(*str++);
     }
