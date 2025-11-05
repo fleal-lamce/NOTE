@@ -41,14 +41,13 @@ class Device{
         sending = (mode == SLAVE_MODE  || mode == MISTER_MODE);
         serving = (mode == MASTER_MODE || mode == MISTER_MODE);
         
-        if(mode == MASTER_MODE)
-            Serial.println("Modo Master Ativo");
-        
-        if(mode == SLAVE_MODE)
-            Serial.println("Modo Slave Ativo");
+        Serial.println(
+            (mode == MASTER_MODE) ? "Modo Master Ativo" :
+            (mode == SLAVE_MODE)  ? "Modo Slave Ativo"  : "Modo Misto Ativo"
+        );
 
         if(mode == MISTER_MODE)
-            Serial.println("Modo Misto Ativo");
+            Serial.println();
 
         if(serving)
             server.connect();

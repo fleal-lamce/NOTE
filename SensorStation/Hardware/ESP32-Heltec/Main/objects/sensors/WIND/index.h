@@ -22,7 +22,8 @@ class WindStation{
             pin(_pin){}
 
         void setup(){
-            pinMode(pin,  INPUT_PULLUP);
+            Serial.println("Wind Station Started");
+            pinMode(pin, INPUT_PULLUP);
         }
 
         void update(){
@@ -34,15 +35,17 @@ class WindStation{
             if(signal != state){
                 state = signal;
 
-                if(signal)
+                if(signal){
                     counter++;
+                    Serial.println("(wind) counter: " + String(counter));
+                }
             }
 
             if(listener.ready(false)){
                 const float t = listener.getSec();
                 listener.reset();
 
-                value   = counter/t * 1000;
+                value   = ((float) counter)/t;
                 counter = 0;
                 setStatus();
                 //Serial.println(status);

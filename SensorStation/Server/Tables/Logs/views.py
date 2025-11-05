@@ -28,4 +28,5 @@ def onAddLogRequest(request):
     for i, var in enumerate(row['variables']):
         data['data'][var] = variables[i]
 
+    print(data)
     return HttpResponse(api.add('logs', data))

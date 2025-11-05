@@ -2,3 +2,6 @@ django
 django-cors-headers
 djangorestframework
 orjson
+unidecode
+dash
+pandas
