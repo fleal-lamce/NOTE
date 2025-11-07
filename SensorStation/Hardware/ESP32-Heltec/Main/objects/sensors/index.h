@@ -12,12 +12,12 @@
 template <typename Parent> class Sensors{
   private:
     Parent* device;
-
+    
   public:
-    WindStation windstation = WindStation(23, 42);
-    RainStation rain = RainStation(15);
-    DHTSensor dht = DHTSensor(36);
-    SHT30 sht = SHT30(4, 15);
+    WindStation windstation = WindStation(13, 4);
+    RainStation rain = RainStation(12);
+    //DHTSensor dht = DHTSensor(4);
+    SHT30 sht = SHT30(8, 9);
     bool available;
 
     Sensors(Parent* dev):
@@ -40,8 +40,12 @@ template <typename Parent> class Sensors{
         
         if(!listener.ready() || device->mode == MASTER_MODE)
             return;
-
-        dataset.info.values[0] = windstation.velocity.value;
+        
+        dataset.info.values[0] = sht.temperature.value;
+        dataset.info.values[1] = sht.humidity.value;
+        dataset.info.values[2] = windstation.velocity.value;
+        dataset.info.values[3] = windstation.direction.value;
+        dataset.info.values[4] = rain.value;
         available = true;
     }
 };

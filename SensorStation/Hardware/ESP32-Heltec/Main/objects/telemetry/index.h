@@ -12,7 +12,7 @@ template <typename Parent> class Telemetry{
     Parent* device;
 
   public:
-    NextSerial<MAX_SIZE> serial{debug ? Serial : Serial2};
+    NextSerial<MAX_SIZE> serial{Serial};
     Protocol<Parent> protocol;
     Text<64> response;
 

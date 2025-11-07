@@ -119,6 +119,8 @@ class DHTSensor{
 
         temperature.update();
         humidity.update();
+        Serial.println("dht temp: " + String(temperature.value));
+        Serial.println("dht humy: " + String(humidity.value));
     }
 };
 

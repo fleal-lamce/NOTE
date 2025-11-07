@@ -1,0 +1,2404 @@
+// Gravação Over-The-Air (OTA)
+
+void Start_ArduinoOTA ()
+{
+  ArduinoOTA.setHostname("RioParamotor_weather_station");
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
+}
+//-------------------------------------------------------------------------------------------------------------
+//////////////////////////////////// GY-BME280 Sensor /////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+
+void Start_BME280()
+{
+   //Wire.begin(D2,D1); 
+  
+  //if (!bme.begin()) {
+  if (! bme.begin(0x76, &Wire)) {
+    Serial.println("*****************************************************");
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    Serial.println("*****************************************************");
+    //while (1);
+  }
+  
+//  bme.setTempCal(-1);
+//  bme.begin();
+}
+
+
+//-------------------------------------------------------------------------------------------------------------
+//////////////////////////////////// Read the Data from Sensors ///////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+void read_BME280(void)
+{
+  
+  //bme.readSensor();
+  //delay(500); 
+  
+  //baromhpa = bme.getPressure_MB()+(altitudepws * 0.12);   // preassure from BME280 sensor
+  baromhpa = bme.readPressure() / 100.0F;   // preassure from BME280 sensor
+  if (baromhpa < 950 || baromhpa > 1050 ) {
+    baromhpa = last_baromhpa;
+  }
+  last_baromhpa = baromhpa;
+  baromin = (baromhpa)/ 33.86;
+  
+  //temp2c = bme.getTemperature_C();    // temperature from BME280 sensor
+  temp2c = bme.readTemperature();    // temperature from BME280 sensor
+  
+  temp2c = (temp2c - 1);
+  if (temp2c_min > temp2c ) {
+    temp2c_min = temp2c;
+  }
+
+  temp_f =  (temp2c_min * 9.0)/ 5.0 + 32.0;   //  converting dew point to F
+
+  //humidity2 = bme.getHumidity();      // humidity from BME280 sensor
+  humidity2 = bme.readHumidity();      // humidity from BME280 sensor
+     
+  Serial.print(F(" Temperature: ")); Serial.print(temp2c); Serial.print(" °C, "); Serial.print(temp_f); Serial.println(" °F  "); 
+  Serial.print(F(" Humidity: "));    Serial.print(humidity2); Serial.println(" %  ");
+  Serial.print(F(" Pressure: "));    Serial.print(baromhpa);Serial.print(" hPa, "); Serial.print(baromin); Serial.println(" inHg  ");
+  
+  dewpt_c = (dewPoint(temp2c_min, humidity2));  //dew point
+  dewpt_f = (dewpt_c * 9.0)/ 5.0 + 32.0;      //  converting dew point to F
+  Serial.print(" Dew point: "); Serial.print(dewpt_c); Serial.print(" °C "); Serial.print(dewpt_f); Serial.println(" °F ");
+  
+  windchill();
+  Serial.print(" Wind chill: "); Serial.print(chill_c); Serial.println(" °C ");
+  
+  heatindex();
+  Serial.print(" Heat index: "); Serial.print(heat_c); Serial.println(" °C "); 
+  
+  //Counter();
+
+}
+
+//-------------------------------- Heat Index ---------------------------------------------
+#define c1 (-42.379)
+#define c2 (2.04901523)
+#define c3 (10.14333127)
+#define c4 (-0.22475541)
+#define c5 (-0.00683783)
+#define c6 (-0.05481717)
+#define c7 (0.00122874)
+#define c8 (0.00085282)
+#define c9 (-0.00000199)
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////// Calculate Heat Index  ///////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void heatindex()
+{
+  if (temp_f > 80.0)   //The heat index only works for temperatures  above 80°F 
+  {
+    heat_f = c1+c2*(temp_f)+c3*(humidity2)+c4*(temp_f)*(humidity2)+c5*(pow(temp_f,2))+c6*(pow(humidity2,2))+c7*(pow(temp_f, 2))*(humidity2)+c8*(temp_f)*(pow(humidity2, 2))+c9*(pow(temp_f, 2))*(pow(humidity2, 2));
+    heat_c = (heat_f - 32)*5/9;  //  converting to C
+    }
+    else
+  {
+    heat_c = temp2c_min;
+  }
+}
+
+
+// calcula sensação térmica
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////// Calculate Windchill  ////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void windchill()
+{
+  if ((temp_f <50.0) && (windgustmph > 3.0)) //The wind chill only works for temperatures  below 50°F and wind speed above 3 mph. (10°C , 1 m/s)
+  {
+    chill_f =35.74+0.6215*temp_f-35.75*pow(wind_speed_avg,0.16)+0.4275*temp_f*pow(wind_speed_avg,0.16);
+    chill_c = (chill_f - 32)*5/9;  //  converting to C
+  } 
+  else
+  {
+    chill_c = temp2c_min;
+  }
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////// Calculate dew Point C ////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+double dewPoint(double tempc_min, double humidity)
+{
+  double RATIO = 373.15 / (273.15 + tempc_min);  // RATIO was originally named A0, possibly confusing in Arduino context
+  double SUM = -7.90298 * (RATIO - 1);
+  SUM += 5.02808 * log10(RATIO);
+  SUM += -1.3816e-7 * (pow(10, (11.344 * (1 - 1/RATIO ))) - 1) ;
+  SUM += 8.1328e-3 * (pow(10, (-3.49149 * (RATIO - 1))) - 1) ;
+  SUM += log10(1013.246);
+  double VP = pow(10, SUM - 3) * humidity;
+  double T = log(VP/0.61078);   // temp var
+  return (241.88 * T) / (17.558 - T);
+}
+
+
+
+
+/*
+ * funcionou separadamente
+ * biblioteca mais simples
+ * 
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+#define BME_SCK 13
+#define BME_MISO 12
+#define BME_MOSI 11
+#define BME_CS 10
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME280 bme; // I2C
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
+
+
+void init_bme280()
+{
+  if (! bme.begin(0x76, &Wire)) {
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    while (1);
+  }
+}
+
+void printValues() {
+    //Serial.print("Temperature = ");
+    Serial.print(bme.readTemperature());
+    Serial.print(" °C | ");
+
+    //Serial.print("Humidity = ");
+    Serial.print(bme.readHumidity());
+    Serial.print(" % |");
+    
+    //Serial.print("Pressure = ");
+    Serial.print(bme.readPressure() / 100.0F);
+    Serial.print(" hPa | ");
+
+    //Serial.print("Approx. Altitude = ");
+    //Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+    //Serial.print(" m   ");
+
+    Serial.println();
+}
+
+*/
+
+void  StartEPROM()
+{
+  EEPROM.begin(512);
+  
+  //RESET EEPROM CONTENT - ONLY EXECUTE ONE TIME - AFTER COMMENT
+  //Serial.println("CLEAR ");
+  //eepromClear();
+  //END - RESET EEPROM CONTENT - ONLY EXECUTE ONE TIME - AFTER COMMENT
+  
+  //GET STORED RAINCOUNT IN EEPROM
+  //Serial.println("EEPROM Rain value");
+  //eepromstring=eepromGet("tipCount1h");
+  //tipCount1h=eepromstring.toFloat();
+  //Serial.print("tipCount1h VALUE FROM EEPROM: ");
+  //Serial.print(tipCount1h);
+  //Serial.println("mm");
+  
+  //eepromstring=eepromGet("tipCount24h");
+  //tipCount24h=eepromstring.toFloat();
+  //Serial.print("tipCount24h VALUE FROM EEPROM: ");
+  //Serial.print(tipCount24h);
+  //Serial.println("mm");
+
+}
+
+
+
+//------------------------------------------------------------------------------------------------------------
+////////////////////////////////////////////////// EEPROM //////////////////////////////////////////////////
+void eepromSet(String name, String value)
+{
+  //Serial.println("eepromSet");
+  
+  String list=eepromDelete(name);
+  String nameValue="&" + name + "=" + value;
+  //Serial.println(list);
+  //Serial.println(nameValue);
+  list+=nameValue;
+  for (int i = 0; i < list.length(); ++i){
+    EEPROM.write(i,list.charAt(i));
+  }
+  EEPROM.commit();
+  //Serial.print(name);
+  //Serial.print(":");
+  //Serial.println(value);
+}
+
+
+String eepromDelete(String name)
+{
+  //Serial.println("eepromDelete");
+  
+  int nameOfValue;
+  String currentName="";
+  String currentValue="";
+  int foundIt=0;
+  char letter;
+  String newList="";
+  for (int i = 0; i < 512; ++i){
+    letter= char(EEPROM.read(i));
+    if (letter=='\n'){
+      if (foundIt==1){
+      }else if (newList.length()>0){
+        newList+="=" + currentValue;
+        }
+        break;
+      } else if (letter=='&'){
+        nameOfValue=0;
+        currentName="";
+        if (foundIt==1){
+          foundIt=0;
+        }else if (newList.length()>0){
+           newList+="=" + currentValue;
+        }
+      } else if (letter=='='){
+        if (currentName==name){
+           foundIt=1;
+        }else{
+           foundIt=0;
+           newList+="&" + currentName;
+        }
+        nameOfValue=1;
+        currentValue="";
+      }
+      else{
+        if (nameOfValue==0){
+          currentName+=letter;
+        }else{
+          currentValue+=letter;
+        }
+      } 
+  }
+  for (int i = 0; i < 512; ++i){
+    EEPROM.write(i,'\n');
+  }
+  EEPROM.commit();
+  for (int i = 0; i < newList.length(); ++i){
+    EEPROM.write(i,newList.charAt(i));
+  }
+  EEPROM.commit();
+  //Serial.println(name);
+  //Serial.println(newList);
+  return newList;
+}
+
+
+void eepromClear()
+{
+  //Serial.println("eepromClear");
+  for (int i = 0; i < 512; ++i){
+    EEPROM.write(i,'\n');
+  }
+}
+
+
+String eepromList()
+{
+  //Serial.println("eepromList");
+  char letter;
+  String list="";
+  for (int i = 0; i < 512; ++i){
+      letter= char(EEPROM.read(i));
+      if (letter=='\n'){
+        break;
+      }else{
+        list+=letter;
+      } 
+  }
+  //Serial.println(list);
+  return list;
+}
+
+
+String eepromGet(String name)
+{
+  //Serial.println("eepromGet");
+  
+  int nameOfValue;
+  String currentName="";
+  String currentValue="";
+  int foundIt=0;
+  String value="";
+  char letter;
+  for (int i = 0; i < 512; ++i){
+      letter= char(EEPROM.read(i));
+      if (letter=='\n'){
+        if (foundIt==1){
+          value=currentValue; 
+        }
+        break;
+      } else if (letter=='&'){
+        nameOfValue=0;
+        currentName="";
+        if (foundIt==1){
+          value=currentValue;
+          break; 
+        }
+      } else if (letter=='='){
+        if (currentName==name){
+           foundIt=1;
+        }else{
+        }
+        nameOfValue=1;
+        currentValue="";
+      }
+      else{
+        if (nameOfValue==0){
+          currentName+=letter;
+        }else{
+          currentValue+=letter;
+        }
+      } 
+  }
+  //Serial.print(name);
+  //Serial.print(":");
+  //Serial.println(value);
+  return value;
+}
+//------------------------------------------------------------------------------------------------------------
+////////////////////////////////////////////////// NTP Time //////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+//--------------------------------Time  zone ------------------------------------------
+const int timeZone = -3;     // GMT-2 Time Zone in Brasilia
+int timec;
+//const int timeZone = -5;  // Eastern Standard Time (USA)
+//const int timeZone = -4;  // Eastern Daylight Time (USA)
+//const int timeZone = -8;  // Pacific Standard Time (USA)
+//const int timeZone = -7;  // Pacific Daylight Time (USA)
+
+//-----------------------------------NTP Servers---------------------------------------------
+static const char ntpServerName[] = "br.pool.ntp.org";
+
+//static const char ntpServerName[] = "pool.ntp.org";
+// const char* ntpServerName = "time.nist.gov";
+//const char* ntpServerName = "time.google.com";
+//const char* ntpServerName = "us.pool.ntp.org";
+//static const char ntpServerName[] = "time.nist.gov";
+//static const char ntpServerName[] = "time-a.timefreq.bldrdoc.gov";
+//static const char ntpServerName[] = "time-b.timefreq.bldrdoc.gov";
+//static const char ntpServerName[] = "time-c.timefreq.bldrdoc.gov";
+
+
+//------------------------------------------------------------------------------------------------------------
+//////////////////////////////////////////////  Time NTP ////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void Start_Ntp()
+{
+  Udp.begin(localPort);
+  setSyncProvider(getNtpTime);
+  setSyncInterval(300);
+
+  //horario de verão
+//  if (month() < 4 || month() >= 11) 
+//  {
+//    timec = timeZone; // Winter time
+//  }
+//  else 
+//  {
+//    timec = timeZone + 1 ;  //Summer time
+//  }
+
+  Udp.begin(localPort);
+  
+  Serial.print(" local port ");
+  Serial.println(Udp.localPort());
+  Serial.println("waiting for sync");
+  setSyncProvider(getNtpTimez);
+  setSyncInterval(300);
+
+  DigitalClockDisplay();
+  
+}
+
+
+//-----------------------------------------------------------
+void time_ntp(void)
+{
+  if (timeStatus() != timeNotSet) {
+    if (now() != prevDisplay) { //update the display only if time has changed
+      prevDisplay = now();
+      digitalClockDisplay();
+    }
+  }  
+}
+
+
+//-----------------------------------------------------------
+void DigitalClockDisplay()
+{
+  // digital clock display of the time
+  Serial.print("  NTP Time: ");
+  Serial.print(hour());
+  printDigits(minute());
+  printDigits(second());
+  Serial.print("  ");
+  Serial.print(day());
+  Serial.print("/");
+  Serial.print(month());
+  Serial.print("/");
+  Serial.print(year());
+  Serial.println();
+}
+
+
+//-----------------------------------------------------------
+void printDigits(int digits)
+{
+  // utility for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if (digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+//////////////////////////////////////////////  NTP Code  ////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+
+//-----------------------------------------------------------
+time_t getNtpTime()
+{
+  IPAddress ntpServerIP; // NTP server's ip address
+
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  
+  // get a random server from the pool
+  WiFi.hostByName(ntpServerName, ntpServerIP);
+  
+  Serial.print("Transmit NTP Request to  ");
+  Serial.print(ntpServerName);
+  Serial.print(" - ");
+  Serial.println(ntpServerIP);
+  
+  sendNTPpacket(ntpServerIP);
+  
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.print("  Receive NTP Response: ");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+
+
+//-----------------------------------------------------------
+time_t getNtpTimez()
+{
+  IPAddress ntpServerIP; // NTP server's ip address
+
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  
+  // get a random server from the pool
+  WiFi.hostByName(ntpServerName, ntpServerIP);
+  
+  Serial.print("Transmit NTP Request to  ");
+  Serial.print(ntpServerName);
+  Serial.print(" - ");
+  Serial.println(ntpServerIP);
+  
+  sendNTPpacket(ntpServerIP);
+  
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.print("  Receive NTP Response: ");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timec * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+
+
+//-----------------------------------------------------------
+// send an NTP request to the time server at the given address
+void sendNTPpacket(IPAddress &address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12] = 49;
+  packetBuffer[13] = 0x4E;
+  packetBuffer[14] = 49;
+  packetBuffer[15] = 52;
+  
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
+}
+/*
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// Get Rain data //////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void getRain(void)
+{
+  cli();         //Disable interrupts
+      
+  rainrate = tipCount1h * Bucket_Size_EU;   
+  rain1h = tipCount1h * Bucket_Size_US;    // 0.3/25.4 = 0.012 bucket size inches
+  rain = tipCount24h * Bucket_Size_EU;
+  rain24h = tipCount24h * Bucket_Size_US;  // 0.3/25.4 = 0.012 bucket size inches
+  
+  if (minute() >= 59)
+  {
+    Serial.println("Reset Hourly Rain");
+    tipCount1h = 0; //reset  Rain counter each 1h
+    eepromstring = String(tipCount1h,2);
+    eepromSet("tipCount1h", eepromstring);
+  
+    for (int i = 0; i < sizeof(windDirections) / sizeof(windDirections[0]); i++)
+    {
+      windDirections[i] = 0;  //reset  Wind direction average  each 1h
+    } 
+  }
+
+  if ((hour() >= 23) && (minute() >= 59))    //reset Daily Rain each 24
+  {
+    Serial.println("Reset Daily Rain");
+    tipCount1h = 0;
+    tipCount24h = 0;
+
+    eepromstring = String(tipCount24h,2);
+    eepromSet("tipCount24h", eepromstring);
+    eepromstring = String(tipCount1h,2);
+    eepromSet("tipCount1h", eepromstring);
+    Serial.println("CLEAR eeprom ");
+    eepromClear();
+
+    delay(100);
+    ESP.restart();
+  }
+  sei();         //Enables interrupts
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////// RAIN Interrupt ///////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+// Interrrupt handler routine that is triggered when the W174 detects rain   
+
+void ICACHE_RAM_ATTR isr_rg() 
+{
+  if((millis() - contactTime) > 2000 ) { // debounce of sensor signal 
+    tipCount1h++;
+    tipCount24h++;
+    
+    //STORE RAINCOUNT IN EEPROM
+    //Serial.println("SET EEPROM");
+    eepromstring = String(tipCount24h,2);
+    eepromSet("tipCount24h", eepromstring);
+    eepromstring = String(tipCount1h,2);
+    eepromSet("tipCount1h", eepromstring);
+    //END - STORE RAINCOUNT IN EEPROM
+   
+    contactTime = millis(); 
+  } 
+} 
+
+*/
+/*
+ *  Escola Rio Paramotor Weather Station
+ *  
+ *  Send data to:
+ *    - Windy.com
+ *    - Thingspeak.com
+ *    - Wunderground.com
+ *    - Weathercloud.net
+ *    - Pwsweather.com
+ *    - Windguru.cz
+ *  
+ *  Main board: NodeMCU ESP12e 
+ *  Anemometer: WRL Eletrônica
+ *  Sensor board: GY-BME2080
+ *  
+ *  based on:
+ *  https://www.instructables.com/id/NodeMCU-Wireless-Weather-Station/
+ *  
+ *  modified by: 
+ *    ggcvirtual@gmail.com - jan2022
+ */
+ 
+#include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino/archive/master.zip
+#include <WiFiUdp.h>
+#include <ESP8266WiFiMulti.h>
+//#include "cactus_io_BME280_I2C.h" // http://static.cactus.io/downloads/library/bme280/cactus_io_BME280_I2C.zip
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+#include <ESP8266mDNS.h>
+#include <ArduinoOTA.h>  //https://github.com/jandrassy/ArduinoOTA
+#include <EEPROM.h>
+#include <TimeLib.h>
+
+ESP8266WiFiMulti wifiMulti;
+
+
+//--------------------------------PWS  altitude ------------------------------------------
+float altitudepws = 18.00;  //Local  altitude of the PWS to get relative pressure  meters (m)
+
+
+//-------------------------------BME280----------------------------------------
+//BME280_I2C bme(0x76);   // I2C using address 0x76
+Adafruit_BME280 bme;      // I2C
+
+
+//------------------------------Rain------------------------------------------------
+//int RainSensorPin = D6;              //Rain REED-ILS sensor GPIO 12
+//#define Bucket_Size_US 0.012         // rain bucket size inches 
+//#define Bucket_Size_EU 0.3           // rain bucket size milimetres ( 0.3mm)
+
+
+//float tipCount1h ;   // bucket tip counter used in interrupt routine
+//float tipCount24h ;  // bucket tip counter used in interrupt routine  
+//unsigned int counter = 15;
+//volatile unsigned long contactTime;
+
+
+//--------------------------------Wind  speed----------------------------------------
+int WindSensorPin = D5;                    // Wind speed -ILS sensor (anemometer) GPIO 14
+volatile unsigned long Rotations = 0;      // cup rotation counter used in interrupt routine
+volatile unsigned long ContactBounceTime;  // Timer to avoid contact bounce in interrupt routine
+
+const float pi = 3.14159265;     //Número de pi
+unsigned long period = 1000;     //Tempo de medida(miliseconds)
+int radius = 147;                //Raio do anemometro(mm)
+//unsigned int scounter = 0;       //Contador para o sensor  
+unsigned int RPM = 0;            //Rotações por minuto
+float speedmps = 0;              //Velocidade do vento (m/s)
+float speedkph = 0;              //Velocidade do vento (km/h)
+float speedmph = 0;              //Velocidade do vento (milhas/h)
+float speedknots = 0;            //Velocidade do vento (knots)
+
+
+//-------------------------------Wind direction-----------------------------------------------
+float wind_avg;         // average wind direction
+int vane_value;         // raw analog value from wind vane
+int Direction;          // translated 0 - 360 direction
+int CalDirection;       // converted value with offset applied
+#define Offset 0;
+int windDirections[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+ 
+
+
+//--------------------------------Setup Wifi----------------------------------------------
+const char* ssid1     = "GGCWiFi-V";   //I use multiple SSID In my home, but you can only define one.
+const char* password1 = "abcdef1234";
+
+const char* ssid2     = "xxxxxxx";
+const char* password2 = "xxxxxxx";
+
+const char* ssid3     = "xxxxxxxxx";
+const char* password3 = "xxxxxxxxx";
+
+const int sleepTimeS = 300; //18000 for Half hour, 300 for 5 minutes etc.
+
+
+//----------------------------------------------------------------------------------------
+WiFiUDP Udp;
+unsigned int localPort = 8888;  // local port to listen for UDP packets
+
+
+time_t getNtpTime();
+void digitalClockDisplay();
+void printDigits(int digits);
+void sendNTPpacket(IPAddress &address);
+
+unsigned long initTimer1;
+unsigned long initTimer2;
+
+
+//--------------------------------WEATHER VAR---------------------------------------------
+float temp2c;               // Temp celsius  BME280
+float temp2c_min = 100;     // Minimum temperature C
+float humidity2;            // Humidity BME280
+float temp_f;               // Temp farenheit 
+float dewpt_f;              // dew point (F)
+float dewpt_c;              // dew point (C)
+float heat_f;               // heat index (F)
+float heat_c;               // heat index (C)
+float windSpeed = 0;        // Wind speed (mph)
+float wind_speed_min = 100; // Minimum wind speed (mph)
+float wind_speed_avg;       // 10 minutes average wind speed ( mph)
+float windgustmph = 0;      // Wind gust speed( mph)
+float windmax = 0;
+float barompa;              // Preasure pascal Pa
+float last_baromhpa;        // previous preasure value
+float baromin;              // Preasure inches of mercury InHg
+float baromhpa;             // Preasure hectopascal hPa
+//float rain1h = 0;         // Rain inches over the past hour
+//float rain = 0;           // Rain milimetres over the past hour
+//float rain24h = 0;        // Rain inches over the past 24 hours
+//float rainrate = 0;       // Rain milimetres over the past 24 hours
+float chill_f;              // Windchill (F)
+float chill_c;              // Windchill (C)
+int dBm;                    // WiFi signal strenght dBm
+int quality;                // WiFi signal quality %
+int chk;
+//String eepromstring = "0.00";
+
+int rmin = 1000; 
+int rmax = 0;
+int Winddir = 0;                 //Direção do vento em graus
+String WindN = "N ";             //Direção do vento em quadrante 
+
+int counter = 0;
+bool debug = 1;           //debug = 1 -> enable debug
+int LED_pin = 16;
+
+int delay1 = 10000;       // 10s delay para enviar dados ao Thingspeak
+int delay2 = 60000;       // 60s delay para enviar dados aos outros sites
+int delay3 = 300000;      // 3min delay para calcular rajadas e velocidade média
+
+
+//-------------------------------- Interruption Functions ---------------------------------------------
+//void ICACHE_RAM_ATTR isr_rg();          //rain 
+void ICACHE_RAM_ATTR isr_rotation();      //rotation
+void ICACHE_RAM_ATTR funcaoInterrupcao(); //rotation
+
+
+//-------------------------------------------------------------------------------------------------------------
+////////////////////////////////////MAIN PROGRAM START/////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+void setup()
+{
+  pinMode(LED_pin, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+
+  Serial.begin(115200);
+
+  Serial.println();
+  Serial.println("-----------------------------------------------------");
+  Serial.println(" RioParamotor Weather Station  v0.1");
+  Serial.println(" Gerson Cunha jan 2022");
+  Serial.println("-----------------------------------------------------");
+  Serial.println("Starting... ");
+  Serial.println();
+  
+  digitalWrite(LED_pin, LOW);   // Turn the LED on (Note that LOW is the voltage level
+  delay(2000);
+
+  Start_BME280();      //inicializa sensor de temperatura, humidade e pressão
+  
+  //StartEPROM();
+
+  Start_Wifi();          // inicializa wifi
+
+  Start_Ntp();           // inicializa ntp (time server)
+    
+  //pinMode(RainSensorPin, INPUT);
+  //attachInterrupt(digitalPinToInterrupt(RainSensorPin), isr_rg, FALLING);  
+  
+  pinMode(WindSensorPin, INPUT);
+  //attachInterrupt(digitalPinToInterrupt(WindSensorPin), isr_rotation, FALLING);  // change if low to high >> RISING
+  attachInterrupt(digitalPinToInterrupt(WindSensorPin), funcaoInterrupcao, RISING);
+  //attachInterrupt(digitalPinToInterrupt(WindSensorPin), isr_rotation, RISING);
+  sei();
+
+  // reprogramação via wifi - OTA : Over-The-Air
+  Start_ArduinoOTA();
+
+  // temporizador do upload
+  initTimer1 = millis();
+  initTimer2 = millis();
+
+  Serial.println();
+  Serial.println("Collecting data from sensors...");
+  Serial.println();
+  
+  digitalWrite(LED_pin, HIGH);  // Turn the LED off by making the voltage HIGH
+}
+time_t prevDisplay = 0; // when the digital clock was displayed
+
+
+
+//-------------------------------------------------------------------------------------------------------------
+void loop()
+{
+
+  Serial.print(" Local Time: ");
+  Serial.print(hour()-3);      // corrigido fuso utm - 3
+  printDigits(minute());
+  printDigits(second());
+  Serial.print("  - next upload in  ");
+  Serial.print(int(float(delay1 - (millis() - initTimer1)) /1000.0F));   // tempo para enviar thingspeak
+  Serial.print(" seg and  ");
+  Serial.print(int(float(delay2 - (millis() - initTimer2)) /1000.0F));   // tempo para enviar aos sites
+  Serial.println(" seg");
+
+  //Start_BME280();      //inicializa sensor de temperatura, humidade e pressão
+  read_BME280();             // read sensors data from analog and digital pins of ESP8266
+  
+  //getWindSpeed();
+  //isr_rotation();
+  getWindSpeedNEW();
+  
+  //getWindDirection();
+  getWindDirectionNEW();
+
+  get_RSSIdBm();               // WiFi signal quality (RSSI)
+  
+  Serial.println();
+
+  // envia dados a cada 10 seg
+  if( millis() > initTimer1 + delay1 ) 
+  {
+    digitalWrite(LED_pin, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    Serial.println("-----------------------------------------------------");
+    thingspeak();            // sends data to thingspeak.com
+
+    initTimer1 = millis();
+    digitalWrite(LED_pin, HIGH);  // Turn the LED off by making the voltage HIGH
+  } 
+
+  // envia dados a cada 60 seg
+   if( millis() > initTimer2 + delay2 )
+  {
+    digitalWrite(LED_pin, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    Serial.println("-----------------------------------------------------");
+    wunderground();          // sends data to wunderground.com
+    weathercloud();          // sends data to weathercloud.net
+    windy();                 // sends data to windy.com
+    pws();                   // sends data to pwsweather.com
+    windguru();              // sends data to windguru.cz
+
+    initTimer2 = millis();
+    digitalWrite(LED_pin, HIGH);  // Turn the LED off by making the voltage HIGH
+   } 
+  
+  // reset no calculo da velocidade média e rajadasa a cada 5 min 
+  if( millis() > initTimer2 + delay3 )
+  {
+    Serial.println("####### reset 5 min #######");
+    windgustmph = 0;
+    wind_speed_avg = 0;
+    wind_speed_min = 100;
+  }
+  
+  //time_ntp();              // get time from NTP server
+
+  //Gravação Over-The-Air (OTA)
+  ArduinoOTA.handle();
+}
+
+
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////// Counter /////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void Counter()
+{
+  if (counter == 18)
+  {
+    windgustmph = 0;
+    wind_speed_avg = 0;
+    wind_speed_min = 100;
+    temp2c_min = 100;
+    counter = 0;  //10 minutes loop     30*20=600s = 10min
+  }
+  counter++;
+}
+
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////// ESP8266 sleep mode ///////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void sleepMode() {
+  Serial.print(F("Sleeping..."));
+  ESP.deepSleep(sleepTimeS * 1000000);
+}
+#include <MD5Builder.h>
+
+MD5Builder _md5;     // Windguru API requires some MD5 hashing
+String md5(String str) {
+  _md5.begin();
+  _md5.add(String(str));
+  _md5.calculate();
+  return _md5.toString();
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// SEND DATA Configuration ////////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+
+//----------------------------Thingspeak.com  API Key ----------------------------------
+const char* server1 = "api.thingspeak.com";
+String Key1 ="N5WV3CXBCCFF4MA3";
+
+
+//----------------------------Wunderground.com  ID PSW ----------------------------------
+char server [] = "rtupdate.wunderground.com";
+char ID [] = "IMARIC6";
+char Key [] = "j6k9OZ5i";  
+
+//----------------------------Weathercloud.net  ID Key ----------------------------------
+const char* server2 = "api.weathercloud.net";
+char ID2 [] = "3c337e4055733125";
+char Key2 [] = "e38ec622d781434bbd2e8f1532384aad";  
+
+
+//----------------------------Windy.com  API Key ----------------------------------
+char server4 []  = "stations.windy.com";
+char Key4 [] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaSI6MzU5NDY4MSwiaWF0IjoxNjQyNjUxNDAyfQ.ReukaPleT9OM_R6sNK9xZ9US7VhT23lMUdMeOFE6Bbs";
+
+
+//----------------------------Pwsweather.com.  ID  ----------------------------------
+char server5 [] = "pwsupdate.pwsweather.com";
+char ID5 [] = "escolarioparamotor";
+char Key5 [] = "b878bd61dd234cfbdca5356e0d34af1a";        
+
+
+//----------------------------Windguru.com  ID  ----------------------------------
+char server6 []  = "www.windguru.cz";
+char ID6 [] = "escolarioparamotor";
+char Key6 [] = "ggcvirtual2022";
+
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////  SEND DATA TO  Thingspeak.com ////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+void thingspeak(void)
+{
+  //if (counter == 17)
+  //{
+  //{  
+    Serial.print("Connecting to ");
+    Serial.print(server1);
+    Serial.println("...");
+    WiFiClient client;
+    
+    if (client.connect(server1, 80)) { // use ip 184.106.153.149 or api.thingspeak.com
+      Serial.print("Connected to ");
+      Serial.println(client.remoteIP());
+  
+      String postStr = Key1;
+      postStr += "&field1=";
+      postStr += String(temp2c_min);
+      postStr += "&field2=";
+      postStr += String(humidity2);
+      postStr += "&field3=";
+      postStr += String(baromhpa);
+      postStr += "&field4=";
+      //postStr += String(wind_speed_avg * 0.447);
+      postStr += String(speedkph);
+      postStr += "&field5=";
+      postStr += String(speedknots);
+      postStr += "&field6=";
+      postStr += String(windgustmph * 0.447);
+      //postStr += String(rain);
+      postStr += "&field7=";
+      postStr += String(Winddir);
+      //postStr += String(getWindDirectionMax());
+      postStr += "&field8=";
+      postStr += String(quality);
+      postStr += "\r\n\r\n";
+   
+      client.print("POST /update HTTP/1.1\n");
+      client.print("Host: api.thingspeak.com\n");
+      client.print("Connection: close\n");
+      client.print("X-THINGSPEAKAPIKEY: " + Key1 + "\n");
+      client.print("Content-Type: application/x-www-form-urlencoded\n");
+      client.print("Content-Length: ");
+      client.print(postStr.length());
+      client.print("\n\n");
+      client.print(postStr);
+    
+      Serial.println();
+      delay(1000);
+   
+    }
+    client.stop();
+  //}
+  //}
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// SEND DATA TO Wunderground.com //////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void wunderground(void)
+{
+  Serial.print("Connecting to ");
+  Serial.print(server);
+  Serial.println("...");
+  WiFiClient client;
+  
+  if (client.connect(server, 80)) {
+    Serial.print("Connected to ");
+    Serial.println(client.remoteIP());
+    delay(100);
+  } else {
+    Serial.println("connection failed");
+  }
+  
+  client.print("GET /weatherstation/updateweatherstation.php?");
+  client.print("ID=");
+  client.print(ID);
+  client.print("&PASSWORD=");
+  client.print(Key);
+  client.print("&dateutc=now&winddir=");
+  //client.print(CalDirection);
+  client.print(Winddir);
+  client.print("&tempf=");
+  client.print(temp_f);
+  client.print("&windspeedmph=");
+  client.print(wind_speed_avg);    
+  //client.print(speedkph / 1.609);    // convert kph to mph
+  client.print("&windgustmph=");
+  client.print(windgustmph);
+  client.print("&dewptf=");
+  client.print(dewpt_f);
+  client.print("&humidity=");
+  client.print(humidity2);
+  client.print("&baromin=");
+  client.print(baromin);
+//  client.print("&rainin=");
+//  client.print(rain1h);
+//  client.print("&dailyrainin=");
+//  client.print(rain24h);
+  client.print("&softwaretype=NodeMCU-ESP12&action=updateraw&realtime=1&rtfreq=30");
+  client.print("/ HTTP/1.1\r\nHost: rtupdate.wunderground.com:80\r\nConnection: close\r\n\r\n");
+  
+  Serial.println();
+  delay(1000);
+  
+  //sleepMode();
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+/////////////////////////////////  SEND DATA TO  Weathercloud.net ////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+void weathercloud(void)
+{
+//if (counter == 17){
+//{
+  Serial.print("Connecting to ");
+  Serial.print(server2);
+  Serial.println("...");
+  
+  WiFiClient client;
+  if (client.connect(server2, 80)) {
+    Serial.print("Connected to ");
+    Serial.println(client.remoteIP());
+  } else {
+    Serial.println("connection failed");
+  }
+  
+  client.print("GET /set/wid/");
+  client.print(ID2);
+  client.print("/key/");
+  client.print(Key2);
+  client.print("/temp/");
+  client.print(temp2c_min*10);
+  client.print("/chill/");
+  client.print(chill_c*10);
+  client.print("/dew/");
+  client.print(dewpt_c*10);
+  client.print("/heat/");
+  client.print(heat_c*10);
+  client.print("/hum/");
+  client.print(humidity2);
+  client.print("/wspd/");
+  client.print(windSpeed*4.47);
+  client.print("/wspdavg/");
+  client.print(wind_speed_avg*4.47);
+  client.print("/wspdhi/");
+  client.print(windgustmph*4.47);
+  client.print("/wdir/");
+  client.print(Winddir);
+  client.print("/wdiravg/");
+  //client.print(getWindDirectionMax());  
+  client.print("/bar/");
+  client.print(baromhpa*10); 
+//  client.print("/rain/");
+//  client.print(rain*10);
+//  client.print("/rainrate/");
+//  client.print(rainrate*10);
+  client.print("/tempin/");
+  client.print(temp2c_min*10);
+  client.print("/dewin/");
+  client.print(dewpt_c*10);
+  client.print("/heatin/");
+  client.print(heat_c*10);
+  client.print("/humin/");
+  client.print(humidity2);
+  //client.print("/uvi/");
+  //client.print(uvi);
+  client.println("/ HTTP/1.1");
+  client.println("Host: api.weathercloud.net");
+  client.println();
+  
+  Serial.println();
+  delay(1000);
+ 
+  if (!client.connected()) {
+    Serial.println("client disconected.");
+    if (client.connect(server2, 80)) {
+      delay(100);
+      Serial.print("connected to ");
+      Serial.println(client.remoteIP());
+    } else {
+      Serial.println("connection failed");
+    }
+  }
+//}
+//}
+  delay(100);
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// SEND DATA TO Windy.com ////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void windy(void)
+{
+  //if ( counter == 16)
+  //{
+    Serial.print("Connecting to ");
+    Serial.print(server4);
+    Serial.println("...");
+    WiFiClient client;
+    
+    if (client.connect(server4, 80)) {
+      Serial.print("Connected to ");
+      Serial.println(client.remoteIP());
+      delay(100);
+    } else {
+      Serial.println("connection failed");
+    }
+  
+    client.print("GET /pws/update/");
+    client.print(Key4);
+    client.print("?winddir=");
+    client.print(Winddir);
+    client.print("&windspeedmph=");
+    client.print(wind_speed_avg);    //avarege
+    client.print("&windgustmph=");
+    client.print(windgustmph * 4.47);
+    client.print("&tempf=");
+    client.print(temp_f);
+    client.print("&baromin=");
+    client.print(baromin);
+    client.print("&dewptf=");
+    client.print(dewpt_c);
+    client.print("&humidity=");
+    client.print(humidity2);
+    client.print("/ HTTP/1.1\r\nHost: stations.windy.com:80\r\nConnection: close\r\n\r\n");
+/*
+    Serial.print(server4);
+    Serial.print("/pws/update/");
+    Serial.print(Key4);
+    Serial.print("?winddir=");
+    Serial.print(Winddir);
+    Serial.print("&windspeedmph=");
+    Serial.print(speedkph * 1.609);
+    Serial.print("&windgustmph=");
+    Serial.print(windgustmph * 4.47);
+    Serial.print("&tempf=");
+    Serial.print(temp_f);
+    Serial.print("&baromin=");
+    Serial.print(baromin);
+    Serial.print("&dewptf=");
+    Serial.print(dewpt_c);
+    Serial.print("&humidity=");
+    Serial.println(humidity2);
+*/
+    
+    Serial.println();
+    delay(1000);
+  //}
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// SEND DATA TO Pwsweather.com//////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void pws(void)
+{
+  Serial.print("Connecting to ");
+  Serial.println(server5);
+  WiFiClient client;
+  
+  if (client.connect(server5, 80)) {
+    Serial.print("connected to ");
+    Serial.println(client.remoteIP());
+    delay(100);
+  } else {
+    Serial.println("connection failed");
+  }
+  
+  client.print("GET /api/v1/submitwx?");
+  client.print("ID=");
+  client.print(ID5);
+  client.print("&PASSWORD=");
+  client.print(Key5);
+  client.print("&dateutc=now&winddir=");
+  //client.print(CalDirection);
+  client.print(Winddir);
+  client.print("&tempf=");
+  client.print(temp_f);
+  client.print("&windspeedmph=");
+  client.print(wind_speed_avg);    
+  client.print("&windgustmph=");
+  client.print(windgustmph);
+  client.print("&dewptf=");
+  client.print(dewpt_f);
+  client.print("&humidity=");
+  client.print(humidity2);
+  client.print("&baromin=");
+  client.print(baromin);
+//  client.print("&rainin=");
+//  client.print(rain1h);
+//  client.print("&dailyrainin=");
+//  client.print(rain24h);
+  client.print("&softwaretype=NodeMCU-ESP12&action=updateraw");
+  client.print("/ HTTP/1.1\r\nHost: pwsupdate.pwsweather.com:80\r\nConnection: close\r\n\r\n");
+  
+  Serial.println();
+  delay(1000);
+  
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+///////////////////////////////// SEND DATA TO Windguru.cz ///////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void windguru(void)
+{
+  //if ( counter == 16)
+  //{
+    Serial.print("Connecting to ");
+    Serial.print(server6);
+    Serial.println("...");
+    WiFiClient client;
+    
+    if (client.connect(server6, 80)) {
+      Serial.print("Connected to ");
+      Serial.println(client.remoteIP());
+      delay(100);
+    } else {
+      Serial.println("connection failed");
+    }
+  
+    client.print("GET /upload/api.php");
+    client.print("?uid=");
+    client.print(ID6);
+    client.print("&salt=");
+    int salt6 = now();
+    client.print(salt6);
+    client.print("&hash=");
+    String hash6 = md5(String(salt6)+String(ID6)+String(Key6));
+    client.print(hash6);
+    client.print("&wind_avg=");
+    client.print(speedknots);
+    //client.print("&wind_min=");
+    //client.print(speedknots);
+    //client.print("&wind_max=");
+    //client.print(speedknots);
+    client.print("&wind_direction=");
+    client.print(Winddir);
+    client.print("&temperature=");
+    client.print(temp2c);
+    client.print("&rh=");
+    client.print(humidity2);
+    client.print("&mslp=");
+    client.print(baromhpa);
+    client.print("/ HTTP/1.1\r\nHost: www.windguru.cz:80\r\nConnection: close\r\n\r\n");
+/*    
+    Serial.print(server6);
+    Serial.print("/upload/api.php");
+    Serial.print("?uid=");
+    Serial.print(ID6);
+    Serial.print("&salt=");
+    //int salt6 = now();
+    Serial.print(salt6);
+    Serial.print("&hash=");
+    //String hash6 = md5(String(salt6)+String(ID6)+String(Key6));
+    Serial.print(hash6);
+    Serial.print("&wind_avg=");
+    Serial.print(speedknots);
+    //client.print("&wind_min=");
+    //client.print(speedknots);
+    //client.print("&wind_max=");
+    //client.print(speedknots);
+    Serial.print("&wind_direction=");
+    Serial.print(Winddir);
+    Serial.print("&temperature=");
+    Serial.print(temp2c);
+    Serial.print("&rh=");
+    Serial.print(humidity2);
+    Serial.print("&mslp=");
+    Serial.println(baromhpa);
+*/
+    Serial.println();
+    delay(1000);
+  //}
+}
+
+//------------------------------------------------------------------------------------------------------------
+////////////////////////////////////////////////// WIFI SETUP ////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+void Start_Wifi()
+{
+  Serial.print("Connecting to Wifi ");
+  delay(1000);
+
+  //inicializa wifi como AP e Station simulatneos
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.hostname("RioParamotor_Weather_station");
+  
+  wifiMulti.addAP(ssid1, password1);        //if you have less SSID, delete the others
+  wifiMulti.addAP(ssid2, password2);
+  wifiMulti.addAP(ssid3, password3);
+
+  while (wifiMulti.run() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");  
+  Serial.print("  IP address: ");
+  Serial.print(WiFi.localIP());
+  Serial.print("  MAC address: ");
+  Serial.println(WiFi.macAddress());
+  
+  delay(500);
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+////////////////////////////////////////////////// RSSI dBm //////////////////////////////////////////////////
+//------------------------------------------------------------------------------------------------------------
+
+void get_RSSIdBm() 
+{
+  while (wifiMulti.run() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  
+  dBm = WiFi.RSSI();
+  quality = 2 * (dBm + 100);
+  if (dBm >= -50)
+    quality = 100;
+ 
+}
+unsigned int scounter = 0;       //Contador para o sensor  
+
+//-------------------------------------------------------------------------------------------------------------
+////////////////////////////////////Get wind speed  /////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+void getWindSpeed(void)
+{
+ 
+  Rotations = 0; // Set Rotations count to 0 ready for calculations
+  //sei(); // Enables interrupts
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  ArduinoOTA.handle();
+  delay (5000); // Wait 5 seconds to average wind speed
+  //cli(); // Disable interrupts
+
+  Serial.print("Rotations: ");
+  Serial.print(Rotations);
+     
+  /* convert to mp/h using the formula V=P(2.25/T)
+  V = P(2.25/30) = P * 0.075       V - speed in mph,  P - pulses per sample period, T - sample period in seconds */
+  windSpeed = Rotations * 0.15; // 30 seconds
+  Rotations = 0;   // Reset count for next sample
+     
+  Serial.print("  windSpeed: ");
+  Serial.println(windSpeed);
+  
+  if (windSpeed > windgustmph) {
+     windgustmph = windSpeed;
+  }
+  if (wind_speed_min > windSpeed ) {
+     wind_speed_min = windSpeed;
+  }
+
+  wind_speed_avg = (windgustmph + wind_speed_min) * 0.5;   // average wind speed mph per 10 minutes
+
+}
+
+
+// This is the function that the interrupt calls to increment the rotation count
+//-------------------------------------------------------------------------------------------------------------
+////////////////////////////////////ISR rotation//////////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+void ICACHE_RAM_ATTR isr_rotation(void)   
+{
+  if ((millis() - ContactBounceTime) > 30 ) {  // debounce the switch contact.
+    Rotations++;
+    ContactBounceTime = millis();
+  }
+}
+
+
+//---------------------------------------------------
+// Convert MPH to Knots
+float getKnots(float speed) 
+{
+   return speed * 0.868976;          //knots 0.868976;
+}
+
+
+//---------------------------------------------------
+// Convert MPH to m/s
+float getms(float speed) 
+{
+   return speed * 0.44704;           //metric m/s 0.44704;;
+}
+
+
+//---------------------------------------------------
+// converts wind speed to wind strength
+void getWindStrength(float speed)
+{
+  if(speed < 1)                         Serial.println("Calm");
+  else if(speed >=  1 && speed <  3)    Serial.println("Light Air");
+  else if(speed >=  3 && speed <  7)    Serial.println("Light Breeze");
+  else if(speed >=  7 && speed < 12)    Serial.println("Gentle Breeze");
+  else if(speed >= 12 && speed < 18)    Serial.println("Moderate Breeze");
+  else if(speed >= 18 && speed < 24)    Serial.println("Fresh Breeze");
+  else if(speed >= 24 && speed < 31)    Serial.println("Strong Breeze");
+  else if(speed >= 31 && speed < 38)    Serial.println("High wind");
+  else if(speed >= 38 && speed < 46)    Serial.println("Fresh Gale");
+  else if(speed >= 46 && speed < 54)    Serial.println("Strong Gale");
+  else if(speed >= 54 && speed < 63)    Serial.println("Storm");
+  else if(speed >= 63 && speed < 72)    Serial.println("Violent storm"); 
+  else if(speed >= 72 && speed)         Serial.println("Hurricane");    
+}
+
+
+
+//-------------------------------------------------------------------------------------------------------------
+////////////////////////////////////Get wind speed  /////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+// by ggcvirtual
+
+//---------------------------------------------------
+//Função para medir velocidade do vento
+void getWindSpeedNEW()
+{
+  speedmps = 0;
+  speedkph = 0;
+  speedknots = 0;
+  
+  scounter = 0;  
+  //attachInterrupt(0, addcount, RISING);
+  //attachInterrupt(digitalPinToInterrupt(pinS), funcaoInterrupcao, RISING);
+  attachInterrupt(digitalPinToInterrupt(WindSensorPin), funcaoInterrupcao, RISING);
+  //attachInterrupt(digitalPinToInterrupt(WindSensorPin), isr_rotation, RISING);
+  
+  //Serial.println("millis 1");
+ 
+  unsigned long millis();       
+  unsigned long startTime = millis();
+  unsigned long endTime = millis();
+  //Serial.println("millis 2");
+  while(endTime < startTime + period) {
+    endTime = millis();
+    //Serial.print(endTime);
+    //Serial.print(" < ");
+    //Serial.print(startTime);
+    //Serial.print(" + ");
+    //Serial.print(period);
+    //Serial.print(" = ");
+    //Serial.println(startTime + period);
+    delay(30);
+    }
+  //Serial.println("millis 3");
+
+  //Função para calcular o RPM
+  RPM=((scounter)*60)/(period/1000);  // Calculate revolutions per minute (RPM)
+
+  //Velocidade do vento em m/s
+  speedmps = ((4 * pi * radius * RPM)/60) / 1000;  //Calcula a velocidade do vento em m/s
+ 
+  //Velocidade do vento em km/h
+  speedkph = (((4 * pi * radius * RPM)/60) / 1000)*3.6;  //Calcula velocidade do vento em km/h
+  
+  //Velocidade do vento em milhas/h
+  speedmph = speedkph / 1.609 ;  //Calcula velocidade do vento em milhas/h
+ 
+  //Velocidade do vento em knots
+  speedknots = speedkph / 1.852;  //Calcula velocidade do vento em knots
+
+  Serial.print(" WindSpeed: ");
+  Serial.print(RPM);
+  Serial.print(" rpm  ");
+  Serial.print(speedmps);
+  Serial.print(" m/s  ");
+  Serial.print(speedkph);
+  Serial.print(" km/h  ");
+  Serial.print(speedknots);
+  Serial.println(" knots");
+
+  //calcula velocidade das rajadas e velocidade media
+  if (speedmph > windgustmph) {
+     windgustmph = speedmph;
+  }
+  if (wind_speed_min > speedmph ) {
+     wind_speed_min = speedmph;
+  }
+
+  wind_speed_avg = (windgustmph + wind_speed_min) * 0.5;   // velocidade media em mph em 5 minutos
+
+
+} //end WinsSpeed
+
+ 
+//---------------------------------------------------
+//Declaração da Função de Interrupção
+//void ICACHE_RAM_ATTR funcaoInterrupcao(); //função de Interrupção armazenada na RAM
+void ICACHE_RAM_ATTR funcaoInterrupcao()
+{
+  scounter++;                          
+  //Serial.print("scounter: ");
+  //Serial.println(scounter);
+}
+
+
+//-------------------------------------------------------------------------------------------------------------
+/////////////////////////////////// Wind direction ////////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------------------------
+void getWindDirectionNEW(void) 
+{
+  vane_value = analogRead(A0);
+  Serial.print(" WindDirection: ");
+  Serial.print(vane_value);
+  
+  if(vane_value < rmin){rmin = vane_value;}
+  if(vane_value > rmax){rmax = vane_value;}
+  Serial.print("  [");  
+  Serial.print(rmin);
+  Serial.print(" ");  
+  Serial.print(rmax);
+  Serial.print("]  ");  
+
+  // valores obtidos no NodeMCU + 4k7
+  if (vane_value <= 231)      { Winddir =  45; WindN = "NE"; }
+  else if (vane_value <= 257) { Winddir =  90; WindN = "E "; }
+  else if (vane_value <= 290) { Winddir = 135; WindN = "SE"; }
+  else if (vane_value <= 335) { Winddir = 180; WindN = "S "; }
+  else if (vane_value <= 397) { Winddir = 225; WindN = "SO"; }
+  else if (vane_value <= 488) { Winddir = 270; WindN = "O "; }
+  else if (vane_value <= 633) { Winddir = 315; WindN = "NO"; }
+  else                        { Winddir =   0; WindN = "N "; }
+
+  Serial.print(Winddir);
+  Serial.print("°  ");  
+  Serial.println(WindN);
+
+}
+const byte ledPin = 13;
+const byte interruptPin = 2;
+volatile byte state = LOW;
+int count=0;
+
+void setup() {
+  Serial.begin(9600);          //inicia serial em 9600 baud rate
+  Serial.println("-------------------------------");
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(interruptPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), blink, CHANGE);
+}
+
+void loop() {
+  digitalWrite(ledPin, state);
+}
+
+void blink() {
+  state = !state;
+  Serial.println(count);
+  count++;
+}
+/***************************************************************************
+  This is a library for the BME280 humidity, temperature & pressure sensor
+
+  Designed specifically to work with the Adafruit BME280 Breakout
+  ----> http://www.adafruit.com/products/2650
+
+  These sensors use I2C or SPI to communicate, 2 or 4 pins are required
+  to interface. The device's I2C address is either 0x76 or 0x77.
+
+  Adafruit invests time and resources providing this open source code,
+  please support Adafruit andopen-source hardware by purchasing products
+  from Adafruit!
+
+  Written by Limor Fried & Kevin Townsend for Adafruit Industries.
+  BSD license, all text above must be included in any redistribution
+  See the LICENSE file for details.
+ ***************************************************************************/
+
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+#define BME_SCK 13
+#define BME_MISO 12
+#define BME_MOSI 11
+#define BME_CS 10
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME280 bme; // I2C
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
+
+unsigned long delayTime;
+
+void setup() {
+    Serial.begin(9600);
+    Serial.println(F("BME280 test"));
+
+    if (! bme.begin(0x76, &Wire)) {
+        Serial.println("Could not find a valid BME280 sensor, check wiring!");
+        while (1);
+    }
+    
+}
+
+
+void loop() {
+
+    Serial.println("----------------------------------------------------");
+    Serial.println("A) Default Test");
+    Serial.println("B) Weather Station Scenario");
+    Serial.println("C) Humidity Sensing Scenario");
+    Serial.println("D) Indoor Navigation Scenario");
+    Serial.println("E) Gaming Scenario");
+    Serial.println("----------------------------------------------------");
+    
+    Serial.println("   | mode   | temp | humi | pres | filter | standby | Temperat | Humidity| Pressure    |");
+    
+    // default mode
+    Serial.print("A) | normal | 16x  | 16x  | 16x  | off    |  0.5ms  | ");
+    bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+                    Adafruit_BME280::SAMPLING_X16,  // temperature
+                    Adafruit_BME280::SAMPLING_X16,  // pressure
+                    Adafruit_BME280::SAMPLING_X16,  // humidity
+                    Adafruit_BME280::FILTER_OFF,
+                    Adafruit_BME280::STANDBY_MS_0_5 );
+    delayTime = 5000;
+    
+    printValues();
+    delay(delayTime);
+
+    
+    // For more details on the following scenarious, see chapter
+    // 3.5 "Recommended modes of operation" in the datasheet
+    
+
+    // weather monitoring
+    Serial.print("B) | forced |  1x  |  1x  |  1x  | off    | 60s     | ");
+    bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                    Adafruit_BME280::SAMPLING_X1, // temperature
+                    Adafruit_BME280::SAMPLING_X1, // pressure
+                    Adafruit_BME280::SAMPLING_X1, // humidity
+                    Adafruit_BME280::FILTER_OFF   );
+                      
+    // suggested rate is 1/60Hz (1m)
+    delayTime = 6000; // in milliseconds
+
+    // Only needed in forced mode! In normal mode, you can remove the next line.
+    bme.takeForcedMeasurement(); // has no effect in normal mode
+    
+    printValues();
+    delay(delayTime);
+
+    
+    // humidity sensing
+    Serial.print("C) | forced |  1x  |  1x  |  0x  | off    |  1s     | ");
+    bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                    Adafruit_BME280::SAMPLING_X1,   // temperature
+                    Adafruit_BME280::SAMPLING_NONE, // pressure
+                    Adafruit_BME280::SAMPLING_X1,   // humidity
+                    Adafruit_BME280::FILTER_OFF );
+                      
+    // suggested rate is 1Hz (1s)
+    delayTime = 1000;  // in milliseconds
+
+    // Only needed in forced mode! In normal mode, you can remove the next line.
+    bme.takeForcedMeasurement(); // has no effect in normal mode
+
+    printValues();
+    delay(delayTime);
+    
+    
+    // indoor navigation
+    Serial.print("D) | forced |  2x  | 16x  |  1x  | 16x    |  0.5ms  | ");
+    bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+                    Adafruit_BME280::SAMPLING_X2,  // temperature
+                    Adafruit_BME280::SAMPLING_X16, // pressure
+                    Adafruit_BME280::SAMPLING_X1,  // humidity
+                    Adafruit_BME280::FILTER_X16,
+                    Adafruit_BME280::STANDBY_MS_0_5 );
+    
+    // suggested rate is 25Hz
+    // 1 + (2 * T_ovs) + (2 * P_ovs + 0.5) + (2 * H_ovs + 0.5)
+    // T_ovs = 2
+    // P_ovs = 16
+    // H_ovs = 1
+    // = 40ms (25Hz)
+    // with standby time that should really be 24.16913... Hz
+    delayTime = 41;
+    
+    // Only needed in forced mode! In normal mode, you can remove the next line.
+    bme.takeForcedMeasurement(); // has no effect in normal mode
+
+    printValues();
+    delay(delayTime);
+    
+    
+    // gaming
+    Serial.print("E) | normal |  1x  |  4x  |  0x  | 16x    |  0.5ms  | ");
+    bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+                    Adafruit_BME280::SAMPLING_X1,   // temperature
+                    Adafruit_BME280::SAMPLING_X4,   // pressure
+                    Adafruit_BME280::SAMPLING_NONE, // humidity
+                    Adafruit_BME280::FILTER_X16,
+                    Adafruit_BME280::STANDBY_MS_0_5 );
+                      
+    // Suggested rate is 83Hz
+    // 1 + (2 * T_ovs) + (2 * P_ovs + 0.5)
+    // T_ovs = 1
+    // P_ovs = 4
+    // = 11.5ms + 0.5ms standby
+    delayTime = 12;
+
+    // Only needed in forced mode! In normal mode, you can remove the next line.
+    bme.takeForcedMeasurement(); // has no effect in normal mode
+
+    printValues();
+    delay(delayTime);
+}
+
+
+void printValues() {
+    //Serial.print("Temperature = ");
+    Serial.print(bme.readTemperature());
+    Serial.print(" °C | ");
+
+    //Serial.print("Humidity = ");
+    Serial.print(bme.readHumidity());
+    Serial.print(" % |");
+    
+    //Serial.print("Pressure = ");
+    Serial.print(bme.readPressure() / 100.0F);
+    Serial.print(" hPa | ");
+
+    //Serial.print("Approx. Altitude = ");
+    //Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+    //Serial.print(" m   ");
+
+    Serial.println();
+}
+/***************************************************************************
+  This is a library for the BME280 humidity, temperature & pressure sensor
+
+  Designed specifically to work with the Adafruit BME280 Breakout
+  ----> http://www.adafruit.com/products/2650
+
+  These sensors use I2C or SPI to communicate, 2 or 4 pins are required
+  to interface. The device's I2C address is either 0x76 or 0x77.
+
+  Adafruit invests time and resources providing this open source code,
+  please support Adafruit andopen-source hardware by purchasing products
+  from Adafruit!
+
+  Written by Limor Fried & Kevin Townsend for Adafruit Industries.
+  BSD license, all text above must be included in any redistribution
+  See the LICENSE file for details.
+ ***************************************************************************/
+
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+//#define BME_SCK 13
+//#define BME_MISO 12
+//#define BME_MOSI 11
+//#define BME_CS 10
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME280 bme; // I2C
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
+
+unsigned long delayTime;
+unsigned status;
+
+void setup() {
+    Serial.begin(9600);
+    while(!Serial);    // time to get serial running
+    Serial.println(F("BME280 test"));
+
+    
+    // default settings
+    //status = bme.begin();  
+    // You can also pass in a Wire library object like &Wire2
+    status = bme.begin(0x76, &Wire);
+    if (!status) {
+        Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+        Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+        Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+        Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+        Serial.print("        ID of 0x60 represents a BME 280.\n");
+        Serial.print("        ID of 0x61 represents a BME 680.\n");
+        //while (1) delay(10);
+    }
+    
+    Serial.println("-- Default Test --");
+    delayTime = 1000;
+
+    Serial.println();
+}
+
+
+void loop() { 
+    //status = bme.begin();  
+    // You can also pass in a Wire library object like &Wire2
+    // status = bme.begin(0x76, &Wire2)
+    //if (!status) {
+    //    Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+    //    Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+    //    Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+    //    Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+    //    Serial.print("        ID of 0x60 represents a BME 280.\n");
+    //    Serial.print("        ID of 0x61 represents a BME 680.\n");
+    //    //while (1) delay(10);
+    //}else{
+    //  printValues();
+    //}
+
+
+    Serial.print("Temperature = ");
+    Serial.print(bme.readTemperature());
+    Serial.println(" °C");
+
+    Serial.print("Pressure = ");
+
+    Serial.print(bme.readPressure() / 100.0F);
+    Serial.println(" hPa");
+
+    Serial.print("Approx. Altitude = ");
+    Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+    Serial.println(" m");
+
+    Serial.print("Humidity = ");
+    Serial.print(bme.readHumidity());
+    Serial.println(" %");
+
+    Serial.println();
+
+    delay(delayTime);
+}
+/********************************************************************************************
+
+                       EEPROM-Cleaner v1.2.0
+
+                       Copyright (c) 2017 Helmut Stult (schinfo)
+
+ ********************************************************************************************/
+
+#include <EEPROM.h>
+#include <ESP8266WiFi.h>
+
+// sizeBytes being the number of bytes you want to use.
+// It's defined with "#define sizeBytes"
+// Size can be anywhere between 4 and 4096 bytes (Default for ESP8266_deauther = 4096)
+#define sizeBytes 4096
+
+// change it for lower or higher endByte (Default for ESP8266_deauther = 4096)
+// normaly it's the same as sizeBytes
+#define endByte 4096
+
+// change it for lower or higher startByte (Default = 0)
+#define startByte 0
+
+unsigned long ok = 0;
+unsigned long nok = 0;
+unsigned long tok = 0;
+
+
+void setup()
+{
+  Serial.begin(115200);
+  EEPROM.begin(sizeBytes);
+
+  delay(100);
+
+  Serial.println("");
+  Serial.println("**************************************************");
+  Serial.println("");
+  Serial.print("    Write a char(255) / hex(FF) from byte ");
+  Serial.print(startByte);
+  Serial.print(" to ");
+  Serial.println(endByte - 1);
+  Serial.print("    into the EEPROM with a defined size of ");
+  Serial.print("");
+  Serial.print(sizeBytes);
+  Serial.println(" Bytes");
+  Serial.println("");
+  Serial.println("**************************************************");
+  Serial.println("");
+
+  Serial.println("    testing EEPROM for written bytes");
+  Serial.println("");
+
+  for (int i = startByte; i < endByte; ++i)
+  {
+    if (EEPROM.read(i) == 255) {
+      ++ok;
+    } else {
+      ++nok;
+    }
+  }
+
+  Serial.printf("        empty bytes: %6d\r\n", ok);
+  Serial.printf("    not empty bytes: %6d\r\n", nok);
+  Serial.println("");
+  Serial.println("**************************************************");
+  Serial.println("");
+
+  Serial.println("**************************************************");
+  Serial.println("");
+  Serial.println("    Start clearing EEPROM... - Please wait!!!");
+  Serial.println("");
+  Serial.println("**************************************************");
+
+  delay(1000);
+
+  // write a char(255) / hex(FF) from startByte until endByte into the EEPROM
+  for (int i = startByte; i < endByte; ++i) {
+    EEPROM.write(i, -1);
+  }
+
+  EEPROM.commit();
+
+  delay(1000);
+
+  Serial.println("");
+  Serial.println("    testing EEPROM for clearing");
+  Serial.println("");
+
+  String test;
+  for (int i = startByte; i < endByte; ++i)
+  {
+    if (EEPROM.read(i) == 255) {
+      ++tok;
+    }
+  }
+  Serial.println("**************************************************");
+  Serial.println("");
+  if (tok = endByte - startByte) {
+    Serial.println("    EEPROM killed correctly");
+  } else
+    Serial.println("    EEPROM not killed - ERROR !!!");
+
+  Serial.println("");
+  Serial.println("**************************************************");
+  Serial.println("");
+  Serial.println("    Ready - You can remove your ESP8266 / LoLin");
+  Serial.println("");
+  Serial.println("**************************************************");
+}
+
+void loop()
+{
+}
+#include <ESP8266WebServer.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+ 
+#define SEALEVELPRESSURE_HPA (1013.25)
+ 
+Adafruit_BME280 bme;
+ 
+float temperature, humidity, pressure, altitude;
+ 
+const char* ssid = "GGCWiFi-V";  // Enter SSID here
+const char* password = "abcdef1234";  //Enter Password here
+ 
+ESP8266WebServer server(80);              
+ 
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+  
+  bme.begin(0x76);   
+ 
+  Serial.println();
+  Serial.println("Connecting to ");
+  Serial.println(ssid);
+ 
+  //Connect to your local wi-fi network
+  WiFi.begin(ssid, password);
+ 
+  //check wi-fi is connected to wi-fi network
+  while (WiFi.status() != WL_CONNECTED) {
+  delay(1000);
+  Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected..!");
+  Serial.print("Got IP: ");  Serial.println(WiFi.localIP());
+ 
+  server.on("/", handle_OnConnect);
+  server.onNotFound(handle_NotFound);
+ 
+  server.begin();
+  Serial.println("HTTP server started");
+ 
+}
+void loop() {
+  server.handleClient();
+
+  Serial.print("Temperature = ");
+  Serial.print(bme.readTemperature());
+  Serial.println(" °C");
+
+  Serial.print("Humidity = ");
+  Serial.print(bme.readHumidity());
+  Serial.println(" %");
+
+  Serial.print("Pressure = ");
+  Serial.print(bme.readPressure() / 100.0F);
+  Serial.println(" hPa");
+
+  Serial.print("Approx. Altitude = ");
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.println(" m");
+
+  Serial.println();
+
+  delay(5000);
+  
+}
+ 
+void handle_OnConnect() {
+  temperature = bme.readTemperature();
+  humidity = bme.readHumidity();
+  pressure = bme.readPressure() / 100.0F;
+  altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  server.send(200, "text/html", SendHTML(temperature,humidity,pressure,altitude)); 
+}
+ 
+void handle_NotFound(){
+  server.send(404, "text/plain", "Not found");
+}
+ 
+String SendHTML(float temperature,float humidity,float pressure,float altitude){
+  String ptr = "<!DOCTYPE html>";
+  ptr +="<html>";
+  ptr +="<head>";
+  ptr +="<title>RioParamotor Weather Station</title>";
+  ptr +="<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  ptr +="<link href='https://fonts.googleapis.com/css?family=Open+Sans:300,400,600' rel='stylesheet'>";
+  ptr +="<style>";
+  ptr +="html { font-family: 'Open Sans', sans-serif; display: block; margin: 0px auto; text-align: center;color: #444444;}";
+  ptr +="body{margin: 0px;} ";
+  ptr +="h1 {margin: 50px auto 30px;} ";
+  ptr +=".side-by-side{display: table-cell;vertical-align: middle;position: relative;}";
+  ptr +=".text{font-weight: 600;font-size: 19px;width: 200px;}";
+  ptr +=".reading{font-weight: 300;font-size: 50px;padding-right: 25px;}";
+  ptr +=".temperature .reading{color: #F29C1F;}";
+  ptr +=".humidity .reading{color: #3B97D3;}";
+  ptr +=".pressure .reading{color: #26B99A;}";
+  ptr +=".altitude .reading{color: #955BA5;}";
+  ptr +=".superscript{font-size: 17px;font-weight: 600;position: absolute;top: 10px;}";
+  ptr +=".data{padding: 10px;}";
+  ptr +=".container{display: table;margin: 0 auto;}";
+  ptr +=".icon{width:65px}";
+  ptr +="</style>";
+  ptr +="</head>";
+  ptr +="<body>";
+  ptr +="<h1>RioParamotor Weather Station</h1>";
+  ptr +="<h3>Escola Rio Paramotor</h3>";
+  ptr +="<div class='container'>";
+  ptr +="<div class='data temperature'>";
+  ptr +="<div class='side-by-side icon'>";
+  ptr +="<svg enable-background='new 0 0 19.438 54.003'height=54.003px id=Layer_1 version=1.1 viewBox='0 0 19.438 54.003'width=19.438px x=0px xml:space=preserve xmlns=http://www.w3.org/2000/svg xmlns:xlink=http://www.w3.org/1999/xlink y=0px><g><path d='M11.976,8.82v-2h4.084V6.063C16.06,2.715,13.345,0,9.996,0H9.313C5.965,0,3.252,2.715,3.252,6.063v30.982";
+  ptr +="C1.261,38.825,0,41.403,0,44.286c0,5.367,4.351,9.718,9.719,9.718c5.368,0,9.719-4.351,9.719-9.718";
+  ptr +="c0-2.943-1.312-5.574-3.378-7.355V18.436h-3.914v-2h3.914v-2.808h-4.084v-2h4.084V8.82H11.976z M15.302,44.833";
+  ptr +="c0,3.083-2.5,5.583-5.583,5.583s-5.583-2.5-5.583-5.583c0-2.279,1.368-4.236,3.326-5.104V24.257C7.462,23.01,8.472,22,9.719,22";
+  ptr +="s2.257,1.01,2.257,2.257V39.73C13.934,40.597,15.302,42.554,15.302,44.833z'fill=#F29C21 /></g></svg>";
+  ptr +="</div>";
+  ptr +="<div class='side-by-side text'>Temperature</div>";
+  ptr +="<div class='side-by-side reading'>";
+  ptr +=(int)temperature;
+  ptr +="<span class='superscript'>&deg;C</span></div>";
+  ptr +="</div>";
+  ptr +="<div class='data humidity'>";
+  ptr +="<div class='side-by-side icon'>";
+  ptr +="<svg enable-background='new 0 0 29.235 40.64'height=40.64px id=Layer_1 version=1.1 viewBox='0 0 29.235 40.64'width=29.235px x=0px xml:space=preserve xmlns=http://www.w3.org/2000/svg xmlns:xlink=http://www.w3.org/1999/xlink y=0px><path d='M14.618,0C14.618,0,0,17.95,0,26.022C0,34.096,6.544,40.64,14.618,40.64s14.617-6.544,14.617-14.617";
+  ptr +="C29.235,17.95,14.618,0,14.618,0z M13.667,37.135c-5.604,0-10.162-4.56-10.162-10.162c0-0.787,0.638-1.426,1.426-1.426";
+  ptr +="c0.787,0,1.425,0.639,1.425,1.426c0,4.031,3.28,7.312,7.311,7.312c0.787,0,1.425,0.638,1.425,1.425";
+  ptr +="C15.093,36.497,14.455,37.135,13.667,37.135z'fill=#3C97D3 /></svg>";
+  ptr +="</div>";
+  ptr +="<div class='side-by-side text'>Humidity</div>";
+  ptr +="<div class='side-by-side reading'>";
+  ptr +=(int)humidity;
+  ptr +="<span class='superscript'>%</span></div>";
+  ptr +="</div>";
+  ptr +="<div class='data pressure'>";
+  ptr +="<div class='side-by-side icon'>";
+  ptr +="<svg enable-background='new 0 0 40.542 40.541'height=40.541px id=Layer_1 version=1.1 viewBox='0 0 40.542 40.541'width=40.542px x=0px xml:space=preserve xmlns=http://www.w3.org/2000/svg xmlns:xlink=http://www.w3.org/1999/xlink y=0px><g><path d='M34.313,20.271c0-0.552,0.447-1,1-1h5.178c-0.236-4.841-2.163-9.228-5.214-12.593l-3.425,3.424";
+  ptr +="c-0.195,0.195-0.451,0.293-0.707,0.293s-0.512-0.098-0.707-0.293c-0.391-0.391-0.391-1.023,0-1.414l3.425-3.424";
+  ptr +="c-3.375-3.059-7.776-4.987-12.634-5.215c0.015,0.067,0.041,0.13,0.041,0.202v4.687c0,0.552-0.447,1-1,1s-1-0.448-1-1V0.25";
+  ptr +="c0-0.071,0.026-0.134,0.041-0.202C14.39,0.279,9.936,2.256,6.544,5.385l3.576,3.577c0.391,0.391,0.391,1.024,0,1.414";
+  ptr +="c-0.195,0.195-0.451,0.293-0.707,0.293s-0.512-0.098-0.707-0.293L5.142,6.812c-2.98,3.348-4.858,7.682-5.092,12.459h4.804";
+  ptr +="c0.552,0,1,0.448,1,1s-0.448,1-1,1H0.05c0.525,10.728,9.362,19.271,20.22,19.271c10.857,0,19.696-8.543,20.22-19.271h-5.178";
+  ptr +="C34.76,21.271,34.313,20.823,34.313,20.271z M23.084,22.037c-0.559,1.561-2.274,2.372-3.833,1.814";
+  ptr +="c-1.561-0.557-2.373-2.272-1.815-3.833c0.372-1.041,1.263-1.737,2.277-1.928L25.2,7.202L22.497,19.05";
+  ptr +="C23.196,19.843,23.464,20.973,23.084,22.037z'fill=#26B999 /></g></svg>";
+  ptr +="</div>";
+  ptr +="<div class='side-by-side text'>Pressure</div>";
+  ptr +="<div class='side-by-side reading'>";
+  ptr +=(int)pressure;
+  ptr +="<span class='superscript'>hPa</span></div>";
+  ptr +="</div>";
+  ptr +="<div class='data altitude'>";
+  ptr +="<div class='side-by-side icon'>";
+  ptr +="<svg enable-background='new 0 0 58.422 40.639'height=40.639px id=Layer_1 version=1.1 viewBox='0 0 58.422 40.639'width=58.422px x=0px xml:space=preserve xmlns=http://www.w3.org/2000/svg xmlns:xlink=http://www.w3.org/1999/xlink y=0px><g><path d='M58.203,37.754l0.007-0.004L42.09,9.935l-0.001,0.001c-0.356-0.543-0.969-0.902-1.667-0.902";
+  ptr +="c-0.655,0-1.231,0.32-1.595,0.808l-0.011-0.007l-0.039,0.067c-0.021,0.03-0.035,0.063-0.054,0.094L22.78,37.692l0.008,0.004";
+  ptr +="c-0.149,0.28-0.242,0.594-0.242,0.934c0,1.102,0.894,1.995,1.994,1.995v0.015h31.888c1.101,0,1.994-0.893,1.994-1.994";
+  ptr +="C58.422,38.323,58.339,38.024,58.203,37.754z'fill=#955BA5 /><path d='M19.704,38.674l-0.013-0.004l13.544-23.522L25.13,1.156l-0.002,0.001C24.671,0.459,23.885,0,22.985,0";
+  ptr +="c-0.84,0-1.582,0.41-2.051,1.038l-0.016-0.01L20.87,1.114c-0.025,0.039-0.046,0.082-0.068,0.124L0.299,36.851l0.013,0.004";
+  ptr +="C0.117,37.215,0,37.62,0,38.059c0,1.412,1.147,2.565,2.565,2.565v0.015h16.989c-0.091-0.256-0.149-0.526-0.149-0.813";
+  ptr +="C19.405,39.407,19.518,39.019,19.704,38.674z'fill=#955BA5 /></g></svg>";
+  ptr +="</div>";
+  ptr +="<div class='side-by-side text'>Altitude</div>";
+  ptr +="<div class='side-by-side reading'>";
+  ptr +=(int)altitude;
+  ptr +="<span class='superscript'>m</span></div>";
+  ptr +="</div>";
+  ptr +="</div>";
+  ptr +="</body>";
+  ptr +="</html>";
+  return ptr;
+}
+/*********
+  Rui Santos
+  Complete project details at https://randomnerdtutorials.com  
+*********/
+
+#include <Wire.h>
+ 
+void setup() {
+  Wire.begin();
+  Serial.begin(115200);
+  Serial.println("\nI2C Scanner");
+}
+ 
+void loop() {
+  byte error, address;
+  int nDevices;
+  Serial.println("Scanning...");
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+      nDevices++;
+    }
+    else if (error==4) {
+      Serial.print("Unknow error at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0) {
+    Serial.println("No I2C devices found\n");
+  }
+  else {
+    Serial.println("done\n");
+  }
+  delay(5000);          
+}
+// HOW TO MAKE AN ARDUINO OHM METER
+//
+// https://www.circuitbasics.com/arduino-ohm-meter/
+//
+
+
+int analogPin = 0;
+int raw = 0;
+int Vin = 5;
+float Vout = 0;
+float R1 = 10000;
+float R2 = 0;
+float buffer = 0;
+
+void setup(){
+Serial.begin(9600);
+}
+
+void loop(){
+  raw = analogRead(analogPin);
+  if(raw){
+    buffer = raw * Vin;
+    Vout = (buffer)/1024.0;
+    buffer = (Vin/Vout) - 1;
+    R2 = R1 * buffer;
+
+
+    Serial.print("R1: ");
+    Serial.print(R1/1000);
+    Serial.print(" K   Volt: ");
+    Serial.print(Vout);
+    Serial.print("   R2: ");
+    Serial.print(R2/1000);
+    Serial.println(" K");
+    
+    delay(500);
+  }
+}
+/*
+  Software serial multple serial test
+
+ Receives from the hardware serial, sends to software serial.
+ Receives from software serial, sends to hardware serial.
+
+ The circuit:
+ * RX is digital pin 2 (connect to TX of other device)
+ * TX is digital pin 3 (connect to RX of other device)
+
+ Note:
+ Not all pins on the Mega and Mega 2560 support change interrupts,
+ so only the following can be used for RX:
+ 10, 11, 12, 13, 50, 51, 52, 53, 62, 63, 64, 65, 66, 67, 68, 69
+
+ Not all pins on the Leonardo support change interrupts,
+ so only the following can be used for RX:
+ 8, 9, 10, 11, 14 (MISO), 15 (SCK), 16 (MOSI).
+
+ created back in the mists of time
+ modified 25 May 2012
+ by Tom Igoe
+ based on Mikal Hart's example
+
+ This example code is in the public domain.
+
+ */
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(2, 3); // RX, TX
+
+void setup()
+{
+  // Open serial communications and wait for port to open:
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Native USB only
+  }
+
+  Serial.println("Arduino - setup!");
+
+  // set the data rate for the SoftwareSerial port
+  mySerial.begin(9600);
+  mySerial.println("serial2usb - setup!");
+}
+
+void loop() // run over and over
+{
+  if (mySerial.available())
+    Serial.write(mySerial.read());
+  if (Serial.available())
+    mySerial.write(Serial.read());
+
+}

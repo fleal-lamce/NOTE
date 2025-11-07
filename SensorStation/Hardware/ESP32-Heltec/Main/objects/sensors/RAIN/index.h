@@ -9,6 +9,7 @@
 
 class RainStation{
   public:
+    unsigned long lastTime = Time::get();
     int pin;
     int counter;
     float value;
@@ -17,26 +18,29 @@ class RainStation{
         pin(_pin){}
 
     void setup(){
-        pinMode(pin, INPUT_PULLUP);
+        
     }
 
     void handle(){
-        static Listener listener = Listener(15000);
+        static Listener listener = Listener(120000);
         static bool state  = false;
-        const bool signal  = !digitalRead(pin);
-
-        if(signal != state){
-            state = signal;
-
-            if(signal)
+        const bool signal  = (analogRead(pin) < 4000);
+        
+        if(signal != state && (Time::get() - lastTime) > 300){
+            if(signal){
                 counter++;
+                Serial.println("rain count: " + String(counter));
+            }
+            
+            state    = signal;
+            lastTime = Time::get();
         }
 
         if(listener.ready(false)){
             const float t = listener.getSec();
             listener.reset();
 
-            value   = counter/t;
+            value   = ((float) counter)/t;
             counter = 0;
         }
     }
